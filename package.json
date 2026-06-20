@@ -9,9 +9,11 @@
   "scripts": {
     "build": "tsc",
     "dev": "node --watch --experimental-specifier-resolution=node --loader ts-node/esm src/app.ts",
-    "start": "node dist/app.js"
+    "start": "node dist/app.js",
+    "migrate": "node --loader ts-node/esm src/db/migrate.ts"
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "pg": "^8.21.0",
     "zod": "^4.4.3"

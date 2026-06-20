@@ -1,3 +1,5 @@
+import "dotenv/config"; // first line of app.ts, before anything else
+
 import env from "./env.js"
 import pg from "pg"
 

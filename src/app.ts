@@ -1,3 +1,4 @@
+import "dotenv/config"; // first line of app.ts, before anything else
 import express from "express";
 import env from "./config/env.js";
 import { connectDB } from "./config/database.js";
