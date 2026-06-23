@@ -2,20 +2,17 @@ import "dotenv/config"; // first line of app.ts, before anything else
 import express from "express";
 import env from "./config/env.js";
 import { connectDB } from "./config/database.js";
+import router from "./api/index.js"
 
 const app = express();
 
 // middlewares
 app.use(express.json());
-
-// routes — add as we build them
-// app.use("/api/products", productRouter);
-// app.use("/api/orders", orderRouter);
-
 // health check — simplest possible for now
 app.get("/health", (req, res) => {
     res.json({ success: true, message: "Server is running" });
 });
+app.use("/", router)
 
 // global error handler — always last
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

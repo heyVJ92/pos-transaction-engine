@@ -10,7 +10,8 @@
     "build": "tsc",
     "dev": "node --watch --experimental-specifier-resolution=node --loader ts-node/esm src/app.ts",
     "start": "node dist/app.js",
-    "migrate": "node --loader ts-node/esm src/db/migrate.ts"
+    "migrate": "node --loader ts-node/esm src/db/migrate.ts",
+    "seed": "node --loader ts-node/esm src/db/seeders/index.ts"
   },
   "dependencies": {
     "dotenv": "^17.4.2",

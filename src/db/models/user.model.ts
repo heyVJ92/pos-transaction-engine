@@ -20,3 +20,5 @@ export interface IUser {
     createdAt: Date;
     updatedAt: Date
 }
+
+export type IUserPublic = Omit<IUser, "id">;

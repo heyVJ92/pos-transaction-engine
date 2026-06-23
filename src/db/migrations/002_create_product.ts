@@ -1,5 +1,5 @@
 export const up = `
-    CREATE TYPE product_category AS ENUM ('beverages', 'snacks', 'grocery', 'dairy', 'other');
+    CREATE TYPE product_category AS ENUM ('beverages', 'snacks', 'grocery', 'dairy', 'others');
     CREATE TYPE product_status AS ENUM ('active', 'inactive');
 
     CREATE TABLE products (
