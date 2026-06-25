@@ -1,5 +1,5 @@
-import type { IProduct } from "../../db/models/product.model.js";
-import { findManyProducts, addNewProduct } from "./product.repository.js";
+import { ProductStatus, type IProduct } from "../../db/models/product.model.js";
+import { findManyProducts, addNewProduct, findSingleProduct, setProductInactive } from "./product.repository.js";
 import type { GetProductQuery, PostProductBody } from "./product.schema.js";
 
 
@@ -25,3 +25,20 @@ export async function listProducts(params: GetProductQuery): Promise<ProductsPag
 export const addProduct = async(body: PostProductBody): Promise<boolean> => {
     return await addNewProduct(body)
 }
+
+export const getProductDetails = async(uuid: string): Promise<IProduct | null> => {
+    const result = await findSingleProduct(uuid)
+    return result
+}
+
+export const removeProduct = async (uuid: string): Promise<"not_found" | "already_inactive" | "success"> => {
+    console.log(uuid, "uuid------2");
+    const product = await findSingleProduct(uuid);
+    console.log(product,"product");
+    if (!product) return "not_found";
+    if (product.status === ProductStatus.INACTIVE) return "already_inactive";
+
+    await setProductInactive(uuid);
+    
+    return "success";
+};

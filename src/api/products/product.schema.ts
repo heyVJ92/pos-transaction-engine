@@ -25,3 +25,6 @@ export const addProductBodySchema = z.object({
 
 export type PostProductBody = z.infer<typeof addProductBodySchema>
 
+export const uuidParamSchema = z.object({
+    uuid: z.string()
+})

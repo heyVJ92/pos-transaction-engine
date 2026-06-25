@@ -13,8 +13,8 @@ interface ProductRow {
     tax:        number;
     weight:     number;
     status:     string;
-    createdAt:  Date;
-    updatedAt:  Date;
+    created_at:  Date;
+    updated_at:  Date;
 }
 
 function rowToProduct (row: ProductRow): IProduct {
@@ -24,13 +24,13 @@ function rowToProduct (row: ProductRow): IProduct {
     name:       row.name,
     sku:        row.sku,
     category:   row.category as ProductCategory,
-    costPrice:  row.cost_price,
-    sellPrice:  row.sell_price,
-    tax:        row.tax,
-    weight:     row.weight,
-    status:     row.category as ProductStatus,
-    createdAt:  row.createdAt,
-    updatedAt:  row.updatedAt,
+    costPrice:  Number(row.cost_price),
+    sellPrice:  Number(row.sell_price),
+    tax:        Number(row.tax),
+    weight:     Number(row.weight),
+    status:     row.status as ProductStatus,
+    createdAt:  row.created_at,
+    updatedAt:  row.updated_at,
     }
 }
 
@@ -131,3 +131,22 @@ export const addNewProduct = async(body: PostProductBody): Promise<boolean> => {
     ])
     return (result.rowCount ?? 0) > 0
 }
+
+export const findSingleProduct = async(uuid: string): Promise<IProduct | null> => {
+    const { rows } = await pool.query('SELECT * FROM products where uuid = $1', [uuid]);
+    console.log(rows,"rows");
+    return rows.length > 0 ?  rowToProduct(rows[0]!) : null
+}
+
+export const updateProduct = async(uuid: string): Promise<{}> => {
+    const result = await pool.query(`UPDATE products status = ${ProductStatus.INACTIVE} where uuid = $1 and status = $2`, [uuid, ProductStatus.ACTIVE]);
+    console.log(result);
+    return result
+}
+
+export const setProductInactive = async (uuid: string): Promise<void> => {
+    await pool.query(
+        `UPDATE products SET status = $1, updated_at = NOW() WHERE uuid = $2`,
+        [ProductStatus.INACTIVE, uuid]
+    );
+};

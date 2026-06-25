@@ -1,10 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
 import * as z from "zod";
 
-type ValidateTarget = "body" | "query"
+type ValidateTarget = "body" | "query" | "params"
 export function validateQuery(schema: z.ZodTypeAny, target: ValidateTarget = "query") {
     return (req: Request, res: Response, next: NextFunction): void => {
-        const data = target === "body" ? req.body : req.query;  
+        const data = target === "body" ? req.body : target === "params" ? req.params : req.query;  
         console.log(data);
         const parsed = schema.safeParse(data);
         if (!parsed.success) {
@@ -12,8 +12,8 @@ export function validateQuery(schema: z.ZodTypeAny, target: ValidateTarget = "qu
                 success: false,
                 error: {
                     code:    "VALIDATION_ERROR",
-                    message: "Invalid query parameters",
-                    details: parsed.error.flatten().fieldErrors,
+                    message: `Invalid ${target} parameters`,
+                    details: z.treeifyError(parsed.error),
                 },
             });
             return;
@@ -21,6 +21,8 @@ export function validateQuery(schema: z.ZodTypeAny, target: ValidateTarget = "qu
         console.log("parsed.data",parsed.data);
         if(target === "body") {
             res.locals["validatedBody"] = parsed.data; 
+        } else if (target === "params") {
+            res.locals["validatedParams"] = parsed.data;
         } else {
             res.locals["validatedQuery"] = parsed.data;
         }
