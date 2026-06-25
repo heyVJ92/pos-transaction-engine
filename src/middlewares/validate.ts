@@ -1,9 +1,12 @@
 import type { Request, Response, NextFunction } from "express";
 import * as z from "zod";
 
-export function validateQuery(schema: z.ZodTypeAny) {
+type ValidateTarget = "body" | "query"
+export function validateQuery(schema: z.ZodTypeAny, target: ValidateTarget = "query") {
     return (req: Request, res: Response, next: NextFunction): void => {
-        const parsed = schema.safeParse(req.query);
+        const data = target === "body" ? req.body : req.query;  
+        console.log(data);
+        const parsed = schema.safeParse(data);
         if (!parsed.success) {
             res.status(400).json({
                 success: false,
@@ -16,7 +19,12 @@ export function validateQuery(schema: z.ZodTypeAny) {
             return;
         }
         console.log("parsed.data",parsed.data);
-        res.locals["validatedQuery"] = parsed.data;
+        if(target === "body") {
+            res.locals["validatedBody"] = parsed.data; 
+        } else {
+            res.locals["validatedQuery"] = parsed.data;
+        }
+
         next();
     };
 }

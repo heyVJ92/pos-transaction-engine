@@ -11,7 +11,7 @@ export enum ProductStatus {
     INACTIVE = "inactive"
 }
 
-export interface IPRODUCT {
+export interface IProduct {
     id : number;
     uuid : string;
     name : string;
@@ -25,3 +25,5 @@ export interface IPRODUCT {
     createdAt: Date;
     updatedAt: Date;
 }
+
+export type IProductPublic = Omit<IProduct, "id">;
