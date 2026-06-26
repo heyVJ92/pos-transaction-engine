@@ -1,6 +1,8 @@
 import * as z from "zod";
 import { ProductCategory, ProductStatus } from "../../db/models/product.model.js";
 
+
+// Get Query Schema
 export const getProductQuerySchema = z.object({
     category: z.enum(ProductCategory).optional(),
     status: z.enum(ProductStatus).optional(),
@@ -13,6 +15,7 @@ export const getProductQuerySchema = z.object({
 
 export type GetProductQuery = z.infer<typeof getProductQuerySchema>
 
+// Post body schema
 export const addProductBodySchema = z.object({
     name: z.string(),
     sku: z.string(),
@@ -28,3 +31,16 @@ export type PostProductBody = z.infer<typeof addProductBodySchema>
 export const uuidParamSchema = z.object({
     uuid: z.string()
 })
+
+// update body schema
+export const updateProductBodySchema = z.object({
+    name: z.string().optional(),
+    sku: z.string().optional(),
+    category: z.enum(ProductCategory).optional(),
+    cost_price: z.coerce.number().optional(),
+    sell_price: z.coerce.number().optional(),
+    weight: z.coerce.number().optional(),
+    tax: z.coerce.number().optional(),
+})
+
+export type UpdateProductBody = z.infer<typeof updateProductBodySchema>

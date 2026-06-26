@@ -1,6 +1,6 @@
 import { pool } from "../../config/database.js";
 import { ProductStatus, type IProduct, type ProductCategory, type IProductPublic } from "../../db/models/product.model.js";
-import type { GetProductQuery, PostProductBody } from "./product.schema.js";
+import type { GetProductQuery, PostProductBody, UpdateProductBody } from "./product.schema.js";
 
 interface ProductRow {
     id:         number;
@@ -39,6 +39,8 @@ export interface QueryResult {
     total: number
 }
 
+
+// Find All Method from here
 function buildWhereClause(params: GetProductQuery): {
     sql: string;
     values: unknown[];
@@ -107,7 +109,7 @@ export async function findManyProducts(params: GetProductQuery): Promise<QueryRe
 
 
 
-
+// Insert Method from here
 const INSERT_PRODUCT_SQL = `
     INSERT INTO products 
         (name, sku, category, cost_price, sell_price, weight, tax, status)
@@ -132,21 +134,62 @@ export const addNewProduct = async(body: PostProductBody): Promise<boolean> => {
     return (result.rowCount ?? 0) > 0
 }
 
+// Detail Method from here
 export const findSingleProduct = async(uuid: string): Promise<IProduct | null> => {
     const { rows } = await pool.query('SELECT * FROM products where uuid = $1', [uuid]);
     console.log(rows,"rows");
     return rows.length > 0 ?  rowToProduct(rows[0]!) : null
 }
 
-export const updateProduct = async(uuid: string): Promise<{}> => {
-    const result = await pool.query(`UPDATE products status = ${ProductStatus.INACTIVE} where uuid = $1 and status = $2`, [uuid, ProductStatus.ACTIVE]);
-    console.log(result);
-    return result
-}
-
+// Delete Method from here
 export const setProductInactive = async (uuid: string): Promise<void> => {
     await pool.query(
         `UPDATE products SET status = $1, updated_at = NOW() WHERE uuid = $2`,
         [ProductStatus.INACTIVE, uuid]
     );
 };
+
+
+// Update Method from here
+const columnMap: Record<string, string> = {
+    name:      "name",
+    sku:       "sku",
+    category:  "category",
+    costPrice: "cost_price",
+    sellPrice: "sell_price",
+    tax:       "tax",
+    weight:    "weight",
+};
+
+const buildUpdateSql = (body: UpdateProductBody): { sql: string; values: unknown[] } => {
+    const clauses: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    for (const [key, value] of Object.entries(body)) {
+        const column = columnMap[key];
+        if (!column) continue; // skip unknown fields
+        clauses.push(`${column} = $${idx}`);
+        values.push(value);
+        idx++;
+    }
+
+    // always update updated_at
+    clauses.push(`updated_at = NOW()`);
+
+    return {
+        sql: clauses.join(", "),
+        values,
+    };
+};
+
+export const updateProduct = async(uuid: string, body: UpdateProductBody): Promise<boolean> => {
+    console.log(body, "------body");
+    const {sql, values} = buildUpdateSql(body);
+    console.log(sql, "------sql");
+    console.log(values, "------values");
+
+    const result = await pool.query(`UPDATE products SET ${sql} where uuid = $${values.length+1} and status = $${values.length+2} RETURNING uuid`, [...values, uuid, ProductStatus.ACTIVE]);
+    console.log(result);
+    return (result.rowCount ?? 0) > 0;
+}

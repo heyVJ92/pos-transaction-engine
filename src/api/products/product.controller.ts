@@ -1,6 +1,6 @@
 import type {Request, Response, NextFunction} from "express"
-import type { GetProductQuery, PostProductBody } from "./product.schema.js"
-import { listProducts, addProduct, getProductDetails, removeProduct } from "./product.service.js";
+import type { GetProductQuery, PostProductBody, UpdateProductBody } from "./product.schema.js"
+import { listProducts, addProduct, getProductDetails, removeProduct, updateProductByUUID } from "./product.service.js";
 import type { IProductPublic } from "../../db/models/product.model.js";
 
 export const listProductsHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -63,6 +63,38 @@ export const productDeleteHandler = async(req: Request, res: Response, next: Nex
     console.log(uuid, "uuid");
     const deleteResponse = await removeProduct(uuid);
     switch (deleteResponse) {
+        case "not_found": {
+            res.status(409).json({
+                success: false,
+                message: "Product not found!",
+            })
+            return;
+        }
+        case "already_inactive": {
+            res.status(409).json({
+                success: false,
+                message: "This Product is already Inactive.",
+            })
+            return;
+        }
+        case "success": {
+            res.status(200).json({
+                success: true,
+                message: "Product Deactivated Successfully."
+            })
+        }
+    }
+}
+
+
+export const productUpdateHandler = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const uuid = res.locals["validatedParams"].uuid as string;
+    console.log(uuid, "--------uuid");
+    const body = res.locals["validatedBody"] as UpdateProductBody;
+    console.log(body, "--------body");
+
+    const updateResponse = await updateProductByUUID(uuid, body);
+    switch (updateResponse) {
         case "not_found": {
             res.status(409).json({
                 success: false,

@@ -18,7 +18,6 @@ export function validateQuery(schema: z.ZodTypeAny, target: ValidateTarget = "qu
             });
             return;
         }
-        console.log("parsed.data",parsed.data);
         if(target === "body") {
             res.locals["validatedBody"] = parsed.data; 
         } else if (target === "params") {
@@ -26,7 +25,10 @@ export function validateQuery(schema: z.ZodTypeAny, target: ValidateTarget = "qu
         } else {
             res.locals["validatedQuery"] = parsed.data;
         }
-
+        let {validatedParams: params, validatedBody: body, validatedQuery: query} = res.locals
+        console.log(params, "----params");
+        console.log(body, "----body");
+        console.log(query, "----query");
         next();
     };
 }
