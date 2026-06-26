@@ -1,5 +1,6 @@
 import { pool } from "../../config/database.js";
 import { ProductStatus, type IProduct, type ProductCategory, type IProductPublic } from "../../db/models/product.model.js";
+import { handleDbError } from "../../utils/db-errors.js";
 import type { GetProductQuery, PostProductBody, UpdateProductBody } from "./product.schema.js";
 
 interface ProductRow {
@@ -120,7 +121,6 @@ const INSERT_PRODUCT_SQL = `
 `;
 
 export const addNewProduct = async(body: PostProductBody): Promise<boolean> => {
-    console.log("body", body);
     const result = await pool.query(INSERT_PRODUCT_SQL, [
         body.name,
         body.sku,
@@ -137,7 +137,6 @@ export const addNewProduct = async(body: PostProductBody): Promise<boolean> => {
 // Detail Method from here
 export const findSingleProduct = async(uuid: string): Promise<IProduct | null> => {
     const { rows } = await pool.query('SELECT * FROM products where uuid = $1', [uuid]);
-    console.log(rows,"rows");
     return rows.length > 0 ?  rowToProduct(rows[0]!) : null
 }
 
@@ -183,13 +182,11 @@ const buildUpdateSql = (body: UpdateProductBody): { sql: string; values: unknown
     };
 };
 
-export const updateProduct = async(uuid: string, body: UpdateProductBody): Promise<boolean> => {
-    console.log(body, "------body");
+export const updateProduct = async(uuid: string, body: UpdateProductBody): Promise<void> => {
     const {sql, values} = buildUpdateSql(body);
-    console.log(sql, "------sql");
-    console.log(values, "------values");
-
-    const result = await pool.query(`UPDATE products SET ${sql} where uuid = $${values.length+1} and status = $${values.length+2} RETURNING uuid`, [...values, uuid, ProductStatus.ACTIVE]);
-    console.log(result);
-    return (result.rowCount ?? 0) > 0;
+    try {
+        await pool.query(`UPDATE products SET ${sql} where uuid = $${values.length+1} and status = $${values.length+2} RETURNING uuid`, [...values, uuid, ProductStatus.ACTIVE]);
+    } catch (err) {
+        handleDbError(err); // converts PG errors to DatabaseError
+    }
 }

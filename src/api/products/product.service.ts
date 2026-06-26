@@ -1,4 +1,5 @@
 import { ProductStatus, type IProduct } from "../../db/models/product.model.js";
+import { DatabaseError } from "../../utils/db-errors.js";
 import { findManyProducts, addNewProduct, findSingleProduct, setProductInactive, updateProduct } from "./product.repository.js";
 import type { GetProductQuery, PostProductBody, UpdateProductBody } from "./product.schema.js";
 
@@ -32,9 +33,7 @@ export const getProductDetails = async(uuid: string): Promise<IProduct | null> =
 }
 
 export const removeProduct = async (uuid: string): Promise<"not_found" | "already_inactive" | "success"> => {
-    console.log(uuid, "uuid------2");
     const product = await findSingleProduct(uuid);
-    console.log(product,"product");
     if (!product) return "not_found";
     if (product.status === ProductStatus.INACTIVE) return "already_inactive";
 
@@ -43,12 +42,19 @@ export const removeProduct = async (uuid: string): Promise<"not_found" | "alread
     return "success";
 };
 
-export const updateProductByUUID = async (uuid: string, body: UpdateProductBody): Promise<"not_found" | "already_inactive" | "success"> => {
-    console.log(body, "--------body");
-
+export const updateProductByUUID = async (uuid: string, body: UpdateProductBody): Promise<"not_found" | "already_inactive" | "sku_conflict" | "success"> => {
     const product = await findSingleProduct(uuid);
     if (!product) return "not_found";
     if (product.status === ProductStatus.INACTIVE) return "already_inactive";
-    await updateProduct(uuid, body);
+    try {
+        await updateProduct(uuid, body);
+        return "success"; 
+    } catch (err) {
+        if(err instanceof DatabaseError && err.code === "UNIQUE_VIOLATION"){
+            return "sku_conflict";
+        }
+        throw err; // unexpected → bubble up to global handler
+    }
+
     return "success"
 };

@@ -2,86 +2,61 @@ import type {Request, Response, NextFunction} from "express"
 import type { GetProductQuery, PostProductBody, UpdateProductBody } from "./product.schema.js"
 import { listProducts, addProduct, getProductDetails, removeProduct, updateProductByUUID } from "./product.service.js";
 import type { IProductPublic } from "../../db/models/product.model.js";
+import { sendCreated, sendError, sendPaginated, sendSuccess } from "../../utils/response.js";
 
 export const listProductsHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const params = res.locals["validatedQuery"] as GetProductQuery;
     const result = await listProducts(params);
     const publicProduct: IProductPublic[] = result.data.map(({id, ...rest}) => rest)
-    res.json({
-        success: true,
-        data: publicProduct,
-        meta: {
+    sendPaginated(
+        res,
+        "Product fetched successfully",
+        publicProduct,
+        {
         total: result.total,
         page: result.page,
         limit: result.limit,
         totalPages: result.totalPages
         }
-    })
+    )
 }
 
 export const addProductHandler = async (req: Request,res: Response, next: NextFunction): Promise<void> => {
     const reqBody = res.locals["validatedBody"] as PostProductBody;
-    console.log("reqBody", reqBody);
     const inserted: boolean = await addProduct(reqBody);
     if(!inserted) {
-        res.status(409).json({
-            success: false,
-            error: {
-                code: "SKU_ALREADY_EXISTS",
-                message: `SKU ${reqBody.sku} already exists`
-            }
-        })
+        sendError(res, "SKU_ALREADY_EXISTS", `SKU ${reqBody.sku} already exists`, 409);
         return;
     }
-    res.status(201).json({
-        success: true,
-        message: "Product successfully added."
-    })
+    sendCreated(res, "Product successfully added.")
 }
 
 export const productDetailsHandler = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
     const uuid = res.locals["validatedParams"].uuid as string;
     const productDetials = await getProductDetails(uuid)
     if(!productDetials) {
-        res.status(409).json({
-            success: false,
-            message: "Product Not Found!"
-        })
+        sendError(res, "NOT_FOUND", `Product Not Found!`, 404);
         return;
     }
-    const {id, ...rest} = productDetials;
-
-    res.json({
-        success: true,
-        message: "Product Detials",
-        data: rest
-    })
+    const {id, ...data} = productDetials;
+    sendSuccess(res, `Product detials fetched successfully.`, data);
 }
 
 export const productDeleteHandler = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
     const uuid = res.locals["validatedParams"].uuid as string;
-    console.log(uuid, "uuid");
     const deleteResponse = await removeProduct(uuid);
     switch (deleteResponse) {
         case "not_found": {
-            res.status(409).json({
-                success: false,
-                message: "Product not found!",
-            })
+            sendError(res, "NOT_FOUND", `Product Not Found!`, 404);
             return;
         }
         case "already_inactive": {
-            res.status(409).json({
-                success: false,
-                message: "This Product is already Inactive.",
-            })
+            sendError(res, "ALREADY_INACTIVE", `This Product is already Inactive!`, 409);
             return;
         }
         case "success": {
-            res.status(200).json({
-                success: true,
-                message: "Product Deactivated Successfully."
-            })
+            sendSuccess(res, `Product Deactivated Successfully.`);
+            return;
         }
     }
 }
@@ -89,31 +64,25 @@ export const productDeleteHandler = async(req: Request, res: Response, next: Nex
 
 export const productUpdateHandler = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
     const uuid = res.locals["validatedParams"].uuid as string;
-    console.log(uuid, "--------uuid");
     const body = res.locals["validatedBody"] as UpdateProductBody;
-    console.log(body, "--------body");
 
     const updateResponse = await updateProductByUUID(uuid, body);
     switch (updateResponse) {
         case "not_found": {
-            res.status(409).json({
-                success: false,
-                message: "Product not found!",
-            })
+            sendError(res, "NOT_FOUND", `Product Not Found!`, 404);
             return;
         }
         case "already_inactive": {
-            res.status(409).json({
-                success: false,
-                message: "This Product is already Inactive.",
-            })
+            sendError(res, "ALREADY_INACTIVE", `Can't update an inactive product!`, 409);
+            return;
+        }
+        case "sku_conflict": {
+            sendError(res, "SKU_ALREADY_EXISTS", `SKU already exists!`, 409);
             return;
         }
         case "success": {
-            res.status(200).json({
-                success: true,
-                message: "Product Deactivated Successfully."
-            })
+            sendSuccess(res, `Product updated Successfully.`);
+            return;
         }
     }
 }
