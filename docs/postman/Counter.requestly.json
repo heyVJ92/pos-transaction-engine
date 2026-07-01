@@ -1,0 +1,187 @@
+{
+  "meta": {
+    "version": "1.1.0",
+    "exportedAt": "2026-07-01T12:34:54.112Z",
+    "exportedUsing": "Requestly API Client"
+  },
+  "records": [
+    {
+      "id": "88d86dfb-5dae-4d22-9c05-421b8b3cdaeb",
+      "name": "Counter",
+      "description": "",
+      "type": "collection",
+      "parentId": null,
+      "deleted": false,
+      "data": {
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    },
+    {
+      "id": "9254c0cb-6dba-4fa0-8b4d-48c31c08e249",
+      "name": "Create Counter",
+      "type": "api",
+      "parentId": "88d86dfb-5dae-4d22-9c05-421b8b3cdaeb",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/counters",
+          "method": "POST",
+          "headers": [],
+          "queryParams": [],
+          "pathVariables": [],
+          "body": {
+            "contentType": "raw",
+            "raw": "{\n      \"name\": \"Counter 1\",\n      \"code\": \"C01\"\n}",
+            "rawContentType": "application/json"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": "am"
+    },
+    {
+      "id": "92c3c5f3-5064-4531-9d82-5bf08482e07e",
+      "name": "Deactivate Counter",
+      "type": "api",
+      "parentId": "88d86dfb-5dae-4d22-9c05-421b8b3cdaeb",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/counters/:uuid",
+          "method": "DELETE",
+          "headers": [],
+          "queryParams": [],
+          "pathVariables": [
+            {
+              "key": "uuid",
+              "value": "",
+              "dataType": "string"
+            }
+          ],
+          "body": {
+            "contentType": "none"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    },
+    {
+      "id": "c7493c36-ccd8-4b43-b551-ab3c84036a06",
+      "name": "Details Counter",
+      "type": "api",
+      "parentId": "88d86dfb-5dae-4d22-9c05-421b8b3cdaeb",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/counters/:uuid",
+          "method": "GET",
+          "headers": [],
+          "queryParams": [],
+          "pathVariables": [
+            {
+              "key": "uuid",
+              "value": "",
+              "dataType": "string"
+            }
+          ],
+          "body": {
+            "contentType": "none"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    },
+    {
+      "id": "b9ef8c34-bd7b-44f6-923b-d55dfd080a78",
+      "name": "List Counters",
+      "type": "api",
+      "parentId": "88d86dfb-5dae-4d22-9c05-421b8b3cdaeb",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/counters?limit=10&status=active",
+          "method": "GET",
+          "headers": [],
+          "queryParams": [
+            {
+              "id": 1782909438841,
+              "key": "limit",
+              "value": "10",
+              "isEnabled": true,
+              "description": ""
+            },
+            {
+              "id": 1782909438842,
+              "key": "status",
+              "value": "active",
+              "isEnabled": true,
+              "description": ""
+            }
+          ],
+          "pathVariables": [],
+          "body": {
+            "contentType": "none"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    },
+    {
+      "id": "cb789e9a-7931-45df-a8d9-1a9cf6546ddb",
+      "name": "Update Counter",
+      "type": "api",
+      "parentId": "88d86dfb-5dae-4d22-9c05-421b8b3cdaeb",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/counters/:uuid",
+          "method": "PUT",
+          "headers": [],
+          "queryParams": [],
+          "pathVariables": [
+            {
+              "key": "uuid",
+              "value": "",
+              "dataType": "string"
+            }
+          ],
+          "body": {
+            "contentType": "raw",
+            "raw": "{\n      \"name\": \"Counter 1 - Updated\",\n      \"code\": \"C01-A\"\n}",
+            "rawContentType": "application/json"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    }
+  ],
+  "environments": [],
+  "packages": []
+}

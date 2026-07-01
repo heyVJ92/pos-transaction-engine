@@ -1,0 +1,187 @@
+{
+  "meta": {
+    "version": "1.1.0",
+    "exportedAt": "2026-07-01T12:34:54.112Z",
+    "exportedUsing": "Requestly API Client"
+  },
+  "records": [
+    {
+      "id": "01900810-c97a-473c-b8a6-ac94b017894d",
+      "name": "Counter Session",
+      "description": "",
+      "type": "collection",
+      "parentId": null,
+      "deleted": false,
+      "data": {
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    },
+    {
+      "id": "d8407f42-ed52-4dd4-8e75-8a59d6c05ab2",
+      "name": "Close Counter Session",
+      "type": "api",
+      "parentId": "01900810-c97a-473c-b8a6-ac94b017894d",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/counter-sessions/:uuid",
+          "method": "DELETE",
+          "headers": [],
+          "queryParams": [],
+          "pathVariables": [
+            {
+              "key": "uuid",
+              "value": "",
+              "dataType": "string"
+            }
+          ],
+          "body": {
+            "contentType": "none"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": "am"
+    },
+    {
+      "id": "a828c1bd-ea6d-4515-a9b1-3cbe970ae1ab",
+      "name": "Details Counter Session",
+      "type": "api",
+      "parentId": "01900810-c97a-473c-b8a6-ac94b017894d",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/counter-sessions/:uuid",
+          "method": "GET",
+          "headers": [],
+          "queryParams": [],
+          "pathVariables": [
+            {
+              "key": "uuid",
+              "value": "",
+              "dataType": "string"
+            }
+          ],
+          "body": {
+            "contentType": "none"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    },
+    {
+      "id": "8132b4e0-d8b1-4fe9-8683-155409c16ca9",
+      "name": "List Counter Sessions",
+      "type": "api",
+      "parentId": "01900810-c97a-473c-b8a6-ac94b017894d",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/counter-sessions?limit=10&status=open",
+          "method": "GET",
+          "headers": [],
+          "queryParams": [
+            {
+              "id": 1782909438843,
+              "key": "limit",
+              "value": "10",
+              "isEnabled": true,
+              "description": ""
+            },
+            {
+              "id": 1782909438844,
+              "key": "status",
+              "value": "open",
+              "isEnabled": true,
+              "description": ""
+            }
+          ],
+          "pathVariables": [],
+          "body": {
+            "contentType": "none"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    },
+    {
+      "id": "01608cb8-1194-4b5b-b111-bacd1437a182",
+      "name": "Open Counter Session",
+      "type": "api",
+      "parentId": "01900810-c97a-473c-b8a6-ac94b017894d",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/counter-sessions",
+          "method": "POST",
+          "headers": [],
+          "queryParams": [],
+          "pathVariables": [],
+          "body": {
+            "contentType": "raw",
+            "raw": "{\n      \"counterUuid\": \"\",\n      \"userUuid\": \"\",\n      \"openingBalance\": 500\n}",
+            "rawContentType": "application/json"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    },
+    {
+      "id": "21047a6c-8167-4bce-8a87-74833c9817ff",
+      "name": "Update Counter Session",
+      "type": "api",
+      "parentId": "01900810-c97a-473c-b8a6-ac94b017894d",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/counter-sessions/:uuid",
+          "method": "PUT",
+          "headers": [],
+          "queryParams": [],
+          "pathVariables": [
+            {
+              "key": "uuid",
+              "value": "",
+              "dataType": "string"
+            }
+          ],
+          "body": {
+            "contentType": "raw",
+            "raw": "{\n      \"closingBalance\": 750\n}",
+            "rawContentType": "application/json"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    }
+  ],
+  "environments": [],
+  "packages": []
+}
