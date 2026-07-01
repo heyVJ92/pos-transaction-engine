@@ -69,6 +69,12 @@ export interface UserQueryResult {
     total: number;
 }
 
+// Single Lookup — used to convert a client-supplied uuid to an internal id (see API_PATTERNS.md §12)
+export const findSingleUser = async(uuid: string): Promise<IUser | null> => {
+    const { rows } = await pool.query('SELECT * FROM users where uuid = $1', [uuid]);
+    return rows.length > 0 ? rowToUser(rows[0]!) : null
+}
+
 export async function findManyUsers(params: GetUsersQuery): Promise<UserQueryResult> {
     const { sql: where, values, nextIndex } = buildWhereClause(params);
 

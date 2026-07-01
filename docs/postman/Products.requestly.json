@@ -1,0 +1,191 @@
+{
+  "meta": {
+    "version": "1.1.0",
+    "exportedAt": "2026-07-01T12:34:54.112Z",
+    "exportedUsing": "Requestly API Client"
+  },
+  "records": [
+    {
+      "id": "ef3350ed-ba35-426d-ae32-198cca523b2b",
+      "name": "Products",
+      "description": "",
+      "type": "collection",
+      "parentId": null,
+      "deleted": false,
+      "data": {
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    },
+    {
+      "id": "ce48cfe7-e761-4483-a103-bd6359f1c339",
+      "name": "Create Product",
+      "type": "api",
+      "parentId": "ef3350ed-ba35-426d-ae32-198cca523b2b",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/products",
+          "method": "POST",
+          "headers": [],
+          "queryParams": [],
+          "pathVariables": [],
+          "body": {
+            "contentType": "raw",
+            "raw": "{\n      \"name\": \"Tropicana Orange Juice 2L\",\n      \"sku\": \"BEV-TR-OJ-2L\",\n      \"category\": \"beverages\",\n      \"costPrice\": \"1.50\",\n      \"sellPrice\": \"3.00\",\n      \"tax\": \"12.00\",\n      \"weight\": \"1.000\"\n}",
+            "rawContentType": "application/json"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": "am"
+    },
+    {
+      "id": "0ca60612-f4e7-4e63-9607-f266c20ad2bc",
+      "name": "Deactive Product",
+      "type": "api",
+      "parentId": "ef3350ed-ba35-426d-ae32-198cca523b2b",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/products/:uuid",
+          "method": "DELETE",
+          "headers": [],
+          "queryParams": [],
+          "pathVariables": [
+            {
+              "key": "uuid",
+              "value": "a8a86663-2ac0-453f-9258-31117edda043",
+              "dataType": "string"
+            }
+          ],
+          "body": {
+            "contentType": "raw",
+            "raw": "{\n      \"name\": \"Tropicana Orange Juice 2L\",\n      \"sku\": \"BEV-TR-OJ-2L\",\n      \"category\": \"beverages\",\n      \"costPrice\": \"1.50\",\n      \"sellPrice\": \"3.00\",\n      \"tax\": \"12.00\",\n      \"weight\": \"1.000\"\n}",
+            "rawContentType": "application/json"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    },
+    {
+      "id": "4574ae6b-73be-4031-aa6f-a689a16a7e8b",
+      "name": "Details Product",
+      "type": "api",
+      "parentId": "ef3350ed-ba35-426d-ae32-198cca523b2b",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/products/:uuid",
+          "method": "GET",
+          "headers": [],
+          "queryParams": [],
+          "pathVariables": [
+            {
+              "key": "uuid",
+              "value": "a8a86663-2ac0-453f-9258-31117edda043",
+              "dataType": "string"
+            }
+          ],
+          "body": {
+            "contentType": "raw",
+            "raw": "{\n      \"name\": \"Tropicana Orange Juice 2L\",\n      \"sku\": \"BEV-TR-OJ-2L\",\n      \"category\": \"beverages\",\n      \"costPrice\": \"1.50\",\n      \"sellPrice\": \"3.00\",\n      \"tax\": \"12.00\",\n      \"weight\": \"1.000\"\n}",
+            "rawContentType": "application/json"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    },
+    {
+      "id": "fa66c8c9-1c9c-4255-bec9-94b3901b29df",
+      "name": "List Products",
+      "type": "api",
+      "parentId": "ef3350ed-ba35-426d-ae32-198cca523b2b",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/products?limit=2&category=beverages",
+          "method": "GET",
+          "headers": [],
+          "queryParams": [
+            {
+              "id": 1782306063858119,
+              "key": "limit",
+              "value": "2",
+              "isEnabled": true,
+              "description": ""
+            },
+            {
+              "id": 1782307052555120,
+              "key": "category",
+              "value": "beverages",
+              "isEnabled": true,
+              "description": ""
+            }
+          ],
+          "pathVariables": [],
+          "body": {
+            "contentType": "none"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    },
+    {
+      "id": "865c5292-b49d-41cc-95b1-64a0c6f9390b",
+      "name": "Update Product",
+      "type": "api",
+      "parentId": "ef3350ed-ba35-426d-ae32-198cca523b2b",
+      "deleted": false,
+      "data": {
+        "type": "http",
+        "request": {
+          "url": "http://localhost:3000/products/:uuid",
+          "method": "PUT",
+          "headers": [],
+          "queryParams": [],
+          "pathVariables": [
+            {
+              "key": "uuid",
+              "value": "a8a86663-2ac0-453f-9258-31117edda043",
+              "dataType": "string"
+            }
+          ],
+          "body": {
+            "contentType": "raw",
+            "raw": "{\n      \"name\": \"Tropicana Orange Juice 2.5L\",\n      \"sku\": \"BEV-TR-OJ-2.5L\",\n      \"tax\": \"6.5\"\n}",
+            "rawContentType": "application/json"
+          },
+          "contentType": "none"
+        },
+        "auth": {
+          "type": "inherit"
+        }
+      },
+      "rank": null
+    }
+  ],
+  "environments": [],
+  "packages": []
+}

@@ -1,5 +1,5 @@
 import { pool } from "../../config/database.js";
-import { ProductStatus, type IProduct, type ProductCategory, type IProductPublic } from "../../db/models/product.model.js";
+import { ProductStatus, type IProduct, type ProductCategory } from "../../db/models/product.model.js";
 import { handleDbError } from "../../utils/db-errors.js";
 import type { GetProductQuery, PostProductBody, UpdateProductBody } from "./product.schema.js";
 
