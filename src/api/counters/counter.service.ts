@@ -55,6 +55,4 @@ export const updateCounterByUUID = async (uuid: string, body: UpdateCounterBody)
         }
         throw err; // unexpected → bubble up to global handler
     }
-
-    return "success"
 };

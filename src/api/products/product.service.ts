@@ -46,15 +46,18 @@ export const updateProductByUUID = async (uuid: string, body: UpdateProductBody)
     const product = await findSingleProduct(uuid);
     if (!product) return "not_found";
     if (product.status === ProductStatus.INACTIVE) return "already_inactive";
+
+    // sku unchanged → drop it from the update so the unique check never fires for it
+    const { sku, ...rest } = body;
+    const updateBody = sku !== undefined && sku === product.sku ? rest : body;
+
     try {
-        await updateProduct(uuid, body);
-        return "success"; 
+        await updateProduct(uuid, updateBody);
+        return "success";
     } catch (err) {
         if(err instanceof DatabaseError && err.code === "UNIQUE_VIOLATION"){
             return "sku_conflict";
         }
         throw err; // unexpected → bubble up to global handler
     }
-
-    return "success"
 };

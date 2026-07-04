@@ -1,19 +1,3 @@
-// src/db/migrate.ts
-
-// 1. import pool from database.ts
-// 2. import fs to read migration folder
-// 3. ensure migrations_history table exists
-// 4. fetch list of already-run migrations from DB
-// 5. read all files in src/migrations folder, sorted
-// 6. filter out already-run ones
-// 7. loop remaining migrations:
-//    - BEGIN transaction
-//    - run migration's `up` SQL
-//    - INSERT into migrations_history
-//    - COMMIT
-//    - if error → ROLLBACK → log → stop (throw/exit)
-
-
 import {pool} from "../config/database.js"
 import fs from "fs/promises";
 export const ensureMigrationsTable  = async () => {

@@ -11,7 +11,7 @@ export const getProductQuerySchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).default(10),
     sort:   z.enum(["name", "category", "cost_price", "sell_price"]).optional(),
     order:  z.enum(["asc", "desc"]).optional(),
-})
+}).strict()
 
 export type GetProductQuery = z.infer<typeof getProductQuerySchema>
 
@@ -37,8 +37,8 @@ export const updateProductBodySchema = z.object({
     name: z.string().optional(),
     sku: z.string().optional(),
     category: z.enum(ProductCategory).optional(),
-    cost_price: z.coerce.number().optional(),
-    sell_price: z.coerce.number().optional(),
+    costPrice: z.coerce.number().optional(),
+    sellPrice: z.coerce.number().optional(),
     weight: z.coerce.number().optional(),
     tax: z.coerce.number().optional(),
 })

@@ -62,9 +62,13 @@ function buildWhereClause(params: GetProductQuery): {
     }
 
     if (params.search !== undefined) {
-        // $idx is referenced 3 times — push the value once, increment idx once
+        // category intentionally excluded: it's a Postgres enum, and ILIKE needs a text operand —
+        // mixing it into this OR-clause with the wildcarded value breaks either way (ILIKE against
+        // an enum, or `=` against a "%term%" string that could never equal an exact enum value).
+        // Exact category filtering already has its own dedicated `category` param above.
+        // $idx is referenced 2 times — push the value once, increment idx once
         conditions.push(
-            `(name ILIKE $${idx} OR category ILIKE $${idx} OR sku ILIKE $${idx})`
+            `(name ILIKE $${idx} OR sku ILIKE $${idx})`
         );
         values.push(`%${params.search}%`);
         idx++;

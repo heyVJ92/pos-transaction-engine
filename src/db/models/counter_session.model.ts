@@ -3,16 +3,17 @@ export enum CounterSessionStatus {
     CLOSED = "closed"
 }
 
-// Enriched resource (API_PATTERNS.md §13) — counter/cashier are JOINed in,
-// never the raw internal counter_id/user_id.
+// Enriched — counter and cashier joined, internal IDs never exposed
 export interface ICounterSession {
     id: number;
     uuid: string;
+    counterId: number;
     counter: {
         uuid: string;
         name: string;
         code: string;
     };
+    userId: number;
     cashier: {
         uuid: string;
         firstName: string;
@@ -29,4 +30,4 @@ export interface ICounterSession {
     updatedAt: Date;
 }
 
-export type ICounterSessionPublic = Omit<ICounterSession, "id">;
+export type ICounterSessionPublic = Omit<ICounterSession, "id" | "counterId" | "userId">;

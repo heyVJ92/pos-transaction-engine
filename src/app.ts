@@ -5,7 +5,6 @@ import env from "./config/env.js";
 import { connectDB } from "./config/database.js";
 import router from "./api/index.js"
 const app = express();
-
 app.use(cors({
     origin: process.env.UI_ORIGIN, // or array of allowed origins
     credentials: true

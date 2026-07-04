@@ -6,18 +6,13 @@ import { sendCreated, sendError, sendPaginated, sendSuccess } from "../../utils/
 
 export const listProductsHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const params = res.locals["validatedQuery"] as GetProductQuery;
-    const result = await listProducts(params);
-    const publicProduct: IProductPublic[] = result.data.map(({id, ...rest}) => rest)
+    const {data, ...metaData} = await listProducts(params);
+    const publicProduct: IProductPublic[] = data.map(({id, ...rest}) => rest)
     sendPaginated(
         res,
         "Product fetched successfully",
         publicProduct,
-        {
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        totalPages: result.totalPages
-        }
+        metaData
     )
 }
 

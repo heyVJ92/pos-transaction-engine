@@ -7,7 +7,7 @@ import { sendCreated, sendError, sendPaginated, sendSuccess } from "../../../uti
 export const listCounterSessionsHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const params = res.locals["validatedQuery"] as GetCounterSessionQuery;
     const result = await listCounterSessions(params);
-    const publicCounterSession: ICounterSessionPublic[] = result.data.map(({id, ...rest}) => rest)
+    const publicCounterSession: ICounterSessionPublic[] = result.data.map(({id, counterId, userId, ...rest}) => rest)
     sendPaginated(
         res,
         "Counter session fetched successfully",

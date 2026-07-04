@@ -16,9 +16,11 @@ interface CounterSessionRow {
     closed_at:          Date | null;
     created_at:         Date;
     updated_at:         Date;
+    counter_id:          number;
     counter_uuid:       string;
     counter_name:       string;
     counter_code:       string;
+    user_id:             number;
     cashier_uuid:       string;
     cashier_first_name: string;
     cashier_last_name:  string;
@@ -28,11 +30,13 @@ function rowToCounterSession (row: CounterSessionRow): ICounterSession {
     return {
     id:              row.id,
     uuid:            row.uuid,
+    counterId:       row.counter_id,
     counter: {
         uuid: row.counter_uuid,
         name: row.counter_name,
         code: row.counter_code,
     },
+    userId:       row.user_id,
     cashier: {
         uuid:      row.cashier_uuid,
         firstName: row.cashier_first_name,
@@ -59,8 +63,8 @@ const SESSION_JOIN_SQL = `
 const SESSION_SELECT_COLUMNS = `
     cs.id, cs.uuid, cs.opening_balance, cs.closing_balance, cs.total_orders, cs.total_amount,
     cs.status, cs.opened_at, cs.closed_at, cs.created_at, cs.updated_at,
-    c.uuid AS counter_uuid, c.name AS counter_name, c.code AS counter_code,
-    u.uuid AS cashier_uuid, u.first_name AS cashier_first_name, u.last_name AS cashier_last_name
+    c.id AS counter_id, c.uuid AS counter_uuid, c.name AS counter_name, c.code AS counter_code,
+    u.id AS user_id,u.uuid AS cashier_uuid, u.first_name AS cashier_first_name, u.last_name AS cashier_last_name
 `;
 
 export interface QueryResult {

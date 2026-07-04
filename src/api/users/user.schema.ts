@@ -9,6 +9,6 @@ export const getUsersQuerySchema = z.object({
   limit:  z.coerce.number().int().min(1).max(100).default(10),
   sort:   z.enum(["created_at", "first_name", "last_name", "email"]).optional(), // allowlist only
   order:  z.enum(["asc", "desc"]).optional(),
-});
+}).strict();
 
 export type GetUsersQuery = z.infer<typeof getUsersQuerySchema>;
