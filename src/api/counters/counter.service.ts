@@ -45,7 +45,12 @@ export const removeCounter = async (uuid: string): Promise<"not_found" | "alread
 export const updateCounterByUUID = async (uuid: string, body: UpdateCounterBody): Promise<"not_found" | "already_inactive" | "code_conflict" | "success"> => {
     const counter = await findSingleCounter(uuid);
     if (!counter) return "not_found";
-    if (counter.status === CounterStatus.INACTIVE) return "already_inactive";
+
+    // Only reactivation (status: "active") is allowed on an inactive counter — everything else
+    // (rename/re-code without reactivating) still requires it to already be active.
+    const isReactivating = body.status === CounterStatus.ACTIVE;
+    if (counter.status === CounterStatus.INACTIVE && !isReactivating) return "already_inactive";
+
     try {
         await updateCounter(uuid, body);
         return "success";

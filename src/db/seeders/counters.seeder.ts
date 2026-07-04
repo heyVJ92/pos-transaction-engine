@@ -8,12 +8,12 @@ const values = [
     {
         name: "Counter 1",
         code: "C01",
-        status: CounterStatus.CLOSE
+        status: CounterStatus.INACTIVE
     },
     {
         name: "Counter 2",
         code: "C02",
-        status: CounterStatus.CLOSE
+        status: CounterStatus.INACTIVE
     }
 ]
 

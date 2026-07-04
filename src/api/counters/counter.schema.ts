@@ -30,6 +30,7 @@ export const uuidParamSchema = z.object({
 export const updateCounterBodySchema = z.object({
     name: z.string().optional(),
     code: z.string().optional(),
+    status: z.enum(CounterStatus).optional(), // status:"active" is the only way to reactivate an inactive counter
 })
 
 export type UpdateCounterBody = z.infer<typeof updateCounterBodySchema>

@@ -7,7 +7,10 @@ export const pool = new pg.Pool({
     connectionString: env.DATABASE_URL,
     max: 10,        // maximum connections
     idleTimeoutMillis: 30000,    // close idle connections after 30s
-    connectionTimeoutMillis: 2000 // fail fast if can't connect in 2s
+    connectionTimeoutMillis: 2000, // fail fast if can't connect in 2s
+    ssl: env.NODE_ENV === "production" 
+        ? { rejectUnauthorized: false }  // ← Render requires this
+        : false 
 });
 
 

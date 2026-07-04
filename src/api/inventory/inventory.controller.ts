@@ -6,6 +6,7 @@ import type { PostInventoryBody } from "./inventory.schema.js";
 
 export const listInventoriesHandler = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
     const query = res.locals["validatedQuery"];
+    console.log("----------------------------->", req.url);
     const {data, ...metaData} = await getAllInventoris(query);
     const inventoryPublicData: IInventoryPublic[] = data.map(({id, productId, ...rest}) => rest);
     sendPaginated(
@@ -25,6 +26,9 @@ export const addInventoryHandler = async (req: Request,res: Response,next: NextF
             return;
         case "product_inactive":
             sendError(res, "PRODUCT_INACTIVE", "Product is inactive", 409);
+            return;
+        case "already_mapped":
+            sendError(res, "ALREADY_EXISTED", "This product already mapping with Inventory.", 409);
             return;
         case "success":
             sendSuccess(res, "Inventory successfully added.");

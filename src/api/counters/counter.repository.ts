@@ -133,6 +133,7 @@ export const setCounterInactive = async (uuid: string): Promise<void> => {
 const columnMap: Record<string, string> = {
     name: "name",
     code: "code",
+    status: "status",
 };
 
 const buildUpdateSql = (body: UpdateCounterBody): { sql: string; values: unknown[] } => {
@@ -159,8 +160,13 @@ const buildUpdateSql = (body: UpdateCounterBody): { sql: string; values: unknown
 
 export const updateCounter = async(uuid: string, body: UpdateCounterBody): Promise<void> => {
     const {sql, values} = buildUpdateSql(body);
+    // Reactivating (status: "active") is the one update allowed on an already-inactive row, so the
+    // guard flips: require the row to currently be inactive instead of active. Every other update
+    // (rename, re-code, or no-op) still requires the row to currently be active.
+    const isReactivating = body.status === CounterStatus.ACTIVE;
+    const guardStatus = isReactivating ? CounterStatus.INACTIVE : CounterStatus.ACTIVE;
     try {
-        await pool.query(`UPDATE counters SET ${sql} where uuid = $${values.length+1} and status = $${values.length+2} RETURNING uuid`, [...values, uuid, CounterStatus.ACTIVE]);
+        await pool.query(`UPDATE counters SET ${sql} where uuid = $${values.length+1} and status = $${values.length+2} RETURNING uuid`, [...values, uuid, guardStatus]);
     } catch (err) {
         handleDbError(err); // converts PG error → DatabaseError
         throw err;          // unreachable, satisfies TypeScript

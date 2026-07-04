@@ -22,11 +22,10 @@ export const getAllInventoris = async (params: GetInventoryQuery): Promise<Inven
     }
 }
 
-export const addInventory = async({product_uuid, availableStock}: PostInventoryBody): Promise<"not_found" | "product_inactive" | "success"> => {
+export const addInventory = async({product_uuid, availableStock}: PostInventoryBody): Promise<"not_found" | "product_inactive" | "already_mapped" | "success"> => {
     const product = await findSingleProduct(product_uuid);
     if(!product) return "not_found"
     if(product.status === ProductStatus.INACTIVE) return "product_inactive"
 
-    await addNewInventory(product.id, availableStock);
-    return "success";
+    return await addNewInventory(product.id, availableStock);
 }
