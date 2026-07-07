@@ -8,23 +8,23 @@
   "main": "dist/app.js",
   "scripts": {
     "build": "npm install && tsc",
-    "dev": "node --watch --experimental-specifier-resolution=node --loader ts-node/esm src/app.ts",
     "start": "node dist/app.js",
-    "migrate": "node --loader ts-node/esm src/db/migrate.ts",
-    "seed": "node --loader ts-node/esm src/db/seeders/index.ts"
+    "dev": "tsx --watch src/app.ts",
+    "migrate": "tsx src/db/migrate.ts",
+    "seed": "tsx src/db/seeders/index.ts"
   },
   "dependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.3",
+    "@types/pg": "^8.20.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "pg": "^8.21.0",
-    "zod": "^4.4.3",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.0",
     "typescript": "^6.0.3",
-    "@types/node": "^25.9.3",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
-    "@types/pg": "^8.20.0",
-    "ts-node": "^10.9.2"
-  },
-  "devDependencies": {}
+    "zod": "^4.4.3"
+  }
 }

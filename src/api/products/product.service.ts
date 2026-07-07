@@ -1,4 +1,4 @@
-import { ProductStatus, type IProduct } from "../../db/models/product.model.js";
+import { ProductStatus, type IProduct, type IProductDetail } from "../../db/models/product.model.js";
 import { DatabaseError } from "../../utils/db-errors.js";
 import { findManyProducts, addNewProduct, findSingleProduct, setProductInactive, updateProduct } from "./product.repository.js";
 import type { GetProductQuery, PostProductBody, UpdateProductBody } from "./product.schema.js";
@@ -27,9 +27,8 @@ export const addProduct = async(body: PostProductBody): Promise<boolean> => {
     return await addNewProduct(body)
 }
 
-export const getProductDetails = async(uuid: string): Promise<IProduct | null> => {
-    const result = await findSingleProduct(uuid)
-    return result
+export const getProductDetails = async(uuid: string): Promise<IProductDetail | null> => {
+    return await findSingleProduct(uuid)
 }
 
 export const removeProduct = async (uuid: string): Promise<"not_found" | "already_inactive" | "success"> => {

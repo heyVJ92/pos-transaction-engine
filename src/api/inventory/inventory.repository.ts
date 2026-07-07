@@ -1,3 +1,4 @@
+import type { PoolClient } from "pg";
 import { pool } from "../../config/database.js";
 import type { IInventory } from "../../db/models/inventory.model.js";
 import { MovementType } from "../../db/models/inventory_movement.model.js";
@@ -114,29 +115,17 @@ export async function findManyInventories(params: GetInventoryQuery): Promise<Qu
     };
 }
 
-
 const INSERT_INVENTORY_SQL = `INSERT INTO inventory (product_id, available_stock, reserved_stock) VALUES ($1, $2, $3) ON CONFLICT (product_id) DO NOTHING RETURNING UUID`
-export const addNewInventory = async(product_id: number, available_stock: number): Promise<"already_mapped" | "success">=> {
-    const client = await pool.connect();
-    try {
-        await client.query("BEGIN");
-        const result = await client.query(INSERT_INVENTORY_SQL, [product_id, available_stock, 0])
+
+export const insertInventory = async(client: PoolClient, product_id: number, availableStock: number): Promise<boolean> => {
+    const result = await client.query(INSERT_INVENTORY_SQL, [product_id, availableStock, 0])
         if((result.rowCount ?? 0) === 0){
-            await client.query("ROLLBACK");
-            return "already_mapped"
-        } 
+            return false
+        }
 
         await client.query(`INSERT INTO inventory_movement (product_id, quantity, movement_type)
                 VALUES ($1, $2, $3)`,
-                [product_id, available_stock, MovementType.INITIAL]
+                [product_id, availableStock, MovementType.INITIAL]
             );
-        client.query("COMMIT");
-        return "success"
-    } catch (err) {
-        await client.query("ROLLBACK");
-        handleDbError(err)
-        throw err        
-    } finally {
-        client.release();
-    }
+        return (result.rowCount ?? 0) > 0;
 }

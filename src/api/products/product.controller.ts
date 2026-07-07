@@ -1,7 +1,7 @@
 import type {Request, Response, NextFunction} from "express"
 import type { GetProductQuery, PostProductBody, UpdateProductBody } from "./product.schema.js"
 import { listProducts, addProduct, getProductDetails, removeProduct, updateProductByUUID } from "./product.service.js";
-import type { IProductPublic } from "../../db/models/product.model.js";
+import type { IProductDetail, IProductPublic } from "../../db/models/product.model.js";
 import { sendCreated, sendError, sendPaginated, sendSuccess } from "../../utils/response.js";
 
 export const listProductsHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {

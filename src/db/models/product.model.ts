@@ -19,11 +19,21 @@ export interface IProduct {
     category : ProductCategory;
     costPrice: number;
     sellPrice: number;
-    tax: number;
-    weight: number;
+    availableStock: number;
+    reservedStock: number;
+    minQty: number;
+    maxQty: number | null;
     status: ProductStatus;
     createdAt: Date;
     updatedAt: Date;
 }
 
 export type IProductPublic = Omit<IProduct, "id">;
+
+// detail extends list — adds tax and weight only
+export interface IProductDetail extends IProduct {
+    tax:    number;
+    weight: number;
+}
+
+export type IProductDetailPublic = Omit<IProductDetail, "id">;
