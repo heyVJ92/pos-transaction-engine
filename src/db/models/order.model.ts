@@ -10,6 +10,7 @@ export interface IOrder {
     id: number;
     uuid: string;
     userId: number;
+    orderNumber: string;
     counterSessionId: number;
     discount: number;
     subTotal: number;

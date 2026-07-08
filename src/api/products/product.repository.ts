@@ -119,7 +119,7 @@ const sortMap: Record<string, string> = {
     "created_at":      "P.created_at",
 };
 
-const PRODUCT_INVENTORY_SQL = `FROM products P INNER JOIN inventory I ON I.product_id = P.id`
+const PRODUCT_INVENTORY_SQL = `FROM products P LEFT JOIN inventory I ON I.product_id = P.id`
 export async function findManyProducts(params: GetProductQuery): Promise<QueryResult> {
     const { sql: where, values, nextIndex } = buildWhereClause(params);
     
@@ -203,6 +203,7 @@ export const addNewProduct = async(body: PostProductBody): Promise<boolean> => {
 
 // Detail Method from here
 export const findSingleProduct = async(uuid: string): Promise<IProductDetail | null> => {
+    console.log(`SELECT P.id, P.uuid, P.name, P.sku, P.category, P.cost_price, P.sell_price, P.tax, P.weight, P.min_qty, P.max_qty, P.status, P.created_at, P.updated_at, I.available_stock, I.reserved_stock ${PRODUCT_INVENTORY_SQL} where P.uuid = $1`);
     const { rows } = await pool.query(`SELECT P.id, P.uuid, P.name, P.sku, P.category, P.cost_price, P.sell_price, P.tax, P.weight, P.min_qty, P.max_qty, P.status, P.created_at, P.updated_at, I.available_stock, I.reserved_stock ${PRODUCT_INVENTORY_SQL} where P.uuid = $1`, [uuid]);
     return rows.length > 0 ?  rowToProductDetail(rows[0]!) : null
 }
