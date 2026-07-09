@@ -45,8 +45,7 @@ export const updateProductBodySchema = z.object({
     sellPrice: z.coerce.number().optional(),
     tax: z.coerce.number().optional(),
     weight: z.coerce.number().optional(),
-    availableStock: z.coerce.number().default(0),
-    minQty: z.coerce.number().default(0),
+    minQty: z.coerce.number().optional(),
     maxQty: z.coerce.number().optional()
 })
 

@@ -1,7 +1,7 @@
 import type {Request, Response, NextFunction} from "express"
 import type { GetProductQuery, PostProductBody, UpdateProductBody } from "./product.schema.js"
-import { listProducts, addProduct, getProductDetails, removeProduct, updateProductByUUID } from "./product.service.js";
-import type { IProductDetail, IProductPublic } from "../../db/models/product.model.js";
+import { listProducts, addProduct, getProductDetails, changeStatusOfProduct, updateProductByUUID } from "./product.service.js";
+import type { IProductPublic } from "../../db/models/product.model.js";
 import { sendCreated, sendError, sendPaginated, sendSuccess } from "../../utils/response.js";
 
 export const listProductsHandler = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -39,18 +39,18 @@ export const productDetailsHandler = async(req: Request, res: Response, next: Ne
 
 export const productDeleteHandler = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
     const uuid = res.locals["validatedParams"].uuid as string;
-    const deleteResponse = await removeProduct(uuid);
-    switch (deleteResponse) {
+    const statusChanged = await changeStatusOfProduct(uuid);
+    switch (statusChanged) {
         case "not_found": {
             sendError(res, "NOT_FOUND", `Product Not Found!`, 404);
             return;
         }
-        case "already_inactive": {
-            sendError(res, "ALREADY_INACTIVE", `This Product is already Inactive!`, 409);
+        case "deactivated": {
+            sendSuccess(res, `Product Deactivated Successfully.`);
             return;
         }
-        case "success": {
-            sendSuccess(res, `Product Deactivated Successfully.`);
+        case "activated": {
+            sendSuccess(res, `Product Activated Successfully.`);
             return;
         }
     }
