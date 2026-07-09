@@ -17,13 +17,13 @@ interface ProductRow {
     reserved_stock: number;
     min_qty: number,
     max_qty: number | null,
+    tax: number,
     status:     string;
     created_at:  Date;
     updated_at:  Date;
 }
 
 interface ProductDetailRow extends ProductRow {
-    tax: number,
     weight: number
 }
 
@@ -60,6 +60,7 @@ function rowToProduct (row: ProductRow): IProduct {
     sellPrice:  Number(row.sell_price),
     availableStock: Number(row.available_stock),
     reservedStock: Number(row.reserved_stock),
+    tax:        Number(row.tax),
     minQty:     Number(row.min_qty),
     maxQty:     row.max_qty !== null ? Number(row.max_qty) : null,
     status:     row.status as ProductStatus,
@@ -119,7 +120,7 @@ const sortMap: Record<string, string> = {
     "created_at":      "P.created_at",
 };
 
-const PRODUCT_INVENTORY_SQL = `FROM products P INNER JOIN inventory I ON I.product_id = P.id`
+const PRODUCT_INVENTORY_SQL = `FROM products P LEFT JOIN inventory I ON I.product_id = P.id`
 export async function findManyProducts(params: GetProductQuery): Promise<QueryResult> {
     const { sql: where, values, nextIndex } = buildWhereClause(params);
     
@@ -129,7 +130,7 @@ export async function findManyProducts(params: GetProductQuery): Promise<QueryRe
 
     const countSql = `SELECT COUNT(*) AS total ${PRODUCT_INVENTORY_SQL} ${where}`;
     const dataSql  = `
-        SELECT P.id, P.uuid, P.name, P.sku, P.category, P.cost_price, P.sell_price, P.min_qty, P.max_qty, P.status, P.created_at, P.updated_at, I.available_stock, I.reserved_stock
+        SELECT P.id, P.uuid, P.name, P.sku, P.category, P.cost_price, P.tax, P.sell_price, P.min_qty, P.max_qty, P.status, P.created_at, P.updated_at, I.available_stock, I.reserved_stock
         ${PRODUCT_INVENTORY_SQL}
         ${where}
         ORDER BY ${sortCol} ${sortOrder.toUpperCase()}
@@ -203,6 +204,7 @@ export const addNewProduct = async(body: PostProductBody): Promise<boolean> => {
 
 // Detail Method from here
 export const findSingleProduct = async(uuid: string): Promise<IProductDetail | null> => {
+    console.log(`SELECT P.id, P.uuid, P.name, P.sku, P.category, P.cost_price, P.sell_price, P.tax, P.weight, P.min_qty, P.max_qty, P.status, P.created_at, P.updated_at, I.available_stock, I.reserved_stock ${PRODUCT_INVENTORY_SQL} where P.uuid = $1`);
     const { rows } = await pool.query(`SELECT P.id, P.uuid, P.name, P.sku, P.category, P.cost_price, P.sell_price, P.tax, P.weight, P.min_qty, P.max_qty, P.status, P.created_at, P.updated_at, I.available_stock, I.reserved_stock ${PRODUCT_INVENTORY_SQL} where P.uuid = $1`, [uuid]);
     return rows.length > 0 ?  rowToProductDetail(rows[0]!) : null
 }
@@ -251,10 +253,10 @@ const buildUpdateSql = (body: UpdateProductBody): { sql: string; values: unknown
     };
 };
 
-export const updateProduct = async(uuid: string, body: UpdateProductBody): Promise<void> => {
-    const {sql, values} = buildUpdateSql(body);
+export const updateProduct = async(uuid: string, reqBody: UpdateProductBody): Promise<void> => {
+    const {sql, values} = buildUpdateSql(reqBody);
     try {
-        await pool.query(`UPDATE products SET ${sql} where uuid = $${values.length+1} and status = $${values.length+2} RETURNING uuid`, [...values, uuid, ProductStatus.ACTIVE]);
+        const result = await pool.query(`UPDATE products SET ${sql} where uuid = $${values.length+1} and status = $${values.length+2} RETURNING uuid`, [...values, uuid, ProductStatus.ACTIVE]);
     } catch (err) {
         handleDbError(err); // converts PG errors to DatabaseError
         throw err;

@@ -1,5 +1,5 @@
 export const up = `
-    CREATE TYPE movement_type AS ENUM ('initial', 'reserved', 'confirmed', 'reverted', 'expired');
+    CREATE TYPE movement_type AS ENUM ('initial', 'reserved', 'confirmed', 'reverted', 'restock', 'expired');
 
     CREATE TABLE inventory_movement (
         id SERIAL PRIMARY KEY,

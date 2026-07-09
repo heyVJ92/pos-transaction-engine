@@ -21,6 +21,7 @@ app.use("/", router)
 // global error handler — always last
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error(err.message);
+    console.log(err.stack);
     res.status(500).json({ success: false, error: { code: "INTERNAL_ERROR", message: err.message } });
 });
 

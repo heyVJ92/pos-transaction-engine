@@ -43,8 +43,11 @@ export const updateProductBodySchema = z.object({
     category: z.enum(ProductCategory).optional(),
     costPrice: z.coerce.number().optional(),
     sellPrice: z.coerce.number().optional(),
-    weight: z.coerce.number().optional(),
     tax: z.coerce.number().optional(),
+    weight: z.coerce.number().optional(),
+    availableStock: z.coerce.number().default(0),
+    minQty: z.coerce.number().default(0),
+    maxQty: z.coerce.number().optional()
 })
 
 export type UpdateProductBody = z.infer<typeof updateProductBodySchema>
