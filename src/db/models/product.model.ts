@@ -23,6 +23,7 @@ export interface IProduct {
     reservedStock: number;
     minQty: number;
     maxQty: number | null;
+    tax: number;
     status: ProductStatus;
     createdAt: Date;
     updatedAt: Date;
@@ -32,7 +33,6 @@ export type IProductPublic = Omit<IProduct, "id">;
 
 // detail extends list — adds tax and weight only
 export interface IProductDetail extends IProduct {
-    tax:    number;
     weight: number;
 }
 
