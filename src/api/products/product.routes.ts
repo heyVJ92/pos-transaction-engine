@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { validateQuery } from "../../middlewares/validate.js";
 import { getProductQuerySchema, addProductBodySchema, uuidParamSchema, updateProductBodySchema } from "./product.schema.js";
-import { listProductsHandler, addProductHandler, productDetailsHandler, productDeleteHandler, productUpdateHandler } from "./product.controller.js";
+import { listProductsHandler, addProductHandler, productDetailsHandler, productStatusToggleHandler, productUpdateHandler } from "./product.controller.js";
 
 const productRouter = Router();
 productRouter.get(
@@ -22,10 +22,10 @@ productRouter.get(
   productDetailsHandler
 )
 
-productRouter.delete(
-  "/:uuid",
+productRouter.put(
+  "/:uuid/status",
   validateQuery(uuidParamSchema, "params"),
-  productDeleteHandler
+  productStatusToggleHandler
 )
 
 productRouter.put(

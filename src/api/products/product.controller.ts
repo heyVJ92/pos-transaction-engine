@@ -37,7 +37,7 @@ export const productDetailsHandler = async(req: Request, res: Response, next: Ne
     sendSuccess(res, `Product detials fetched successfully.`, data);
 }
 
-export const productDeleteHandler = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+export const productStatusToggleHandler = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
     const uuid = res.locals["validatedParams"].uuid as string;
     const statusChanged = await changeStatusOfProduct(uuid);
     switch (statusChanged) {
