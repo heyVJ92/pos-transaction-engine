@@ -5,8 +5,15 @@ import env from "./config/env.js";
 import { connectDB } from "./config/database.js";
 import router from "./api/index.js"
 const app = express();
+
+const allowedOrigins = env.ALLOWED_ORIGINS.split(",").map(origin => origin.trim());
+
 app.use(cors({
-    origin: process.env.UI_ORIGIN, // or array of allowed origins
+    origin: (requestOrigin, callback) => {
+    if(!requestOrigin) return callback(null, true);
+    if(allowedOrigins.includes(requestOrigin)) return callback(null, true);
+    else callback(new Error(`CORS: origin ${requestOrigin} not allowed!`));
+    }, // or array of allowed origins
     credentials: true
 }));
 
@@ -29,6 +36,6 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 await connectDB();
 
 app.listen(env.PORT, () => {
-    console.log(`✅ Server running on port ${env.PORT}`);
+    console.log(`✅ Server running on port http://localhost:${env.PORT}`);
     console.log(`✅ Environment: ${env.NODE_ENV}`);
 });
