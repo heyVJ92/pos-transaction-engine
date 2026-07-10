@@ -5,7 +5,7 @@ import { ProductCategory, ProductStatus } from "../../db/models/product.model.js
 // Get Query Schema
 export const getProductQuerySchema = z.object({
     category: z.enum(ProductCategory).optional(),
-    lowStock: z.boolean().optional(),
+    lowStock: z.coerce.boolean().optional(),
     status: z.enum(ProductStatus).optional(),
     search: z.string().min(1).max(100).optional(),
     page: z.coerce.number().int().min(1).max(100).default(1),
@@ -45,8 +45,7 @@ export const updateProductBodySchema = z.object({
     sellPrice: z.coerce.number().optional(),
     tax: z.coerce.number().optional(),
     weight: z.coerce.number().optional(),
-    availableStock: z.coerce.number().default(0),
-    minQty: z.coerce.number().default(0),
+    minQty: z.coerce.number().optional(),
     maxQty: z.coerce.number().optional()
 })
 

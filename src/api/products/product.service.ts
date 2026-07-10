@@ -1,6 +1,6 @@
 import { ProductStatus, type IProduct, type IProductDetail } from "../../db/models/product.model.js";
 import { DatabaseError } from "../../utils/db-errors.js";
-import { findManyProducts, addNewProduct, findSingleProduct, setProductInactive, updateProduct } from "./product.repository.js";
+import { findManyProducts, addNewProduct, findSingleProduct, setProductStatus, updateProduct } from "./product.repository.js";
 import type { GetProductQuery, PostProductBody, UpdateProductBody } from "./product.schema.js";
 
 
@@ -31,14 +31,14 @@ export const getProductDetails = async(uuid: string): Promise<IProductDetail | n
     return await findSingleProduct(uuid)
 }
 
-export const removeProduct = async (uuid: string): Promise<"not_found" | "already_inactive" | "success"> => {
+export const changeStatusOfProduct = async (uuid: string): Promise<"not_found" | "activated" | "deactivated"> => {
     const product = await findSingleProduct(uuid);
     if (!product) return "not_found";
-    if (product.status === ProductStatus.INACTIVE) return "already_inactive";
+    const updateStatus = product.status === ProductStatus.INACTIVE ? ProductStatus.ACTIVE : ProductStatus.INACTIVE;
 
-    await setProductInactive(uuid);
-    
-    return "success";
+    await setProductStatus(uuid, updateStatus);
+
+    return updateStatus === ProductStatus.ACTIVE ? "activated" : "deactivated";
 };
 
 export const updateProductByUUID = async (uuid: string, body: UpdateProductBody): Promise<"not_found" | "already_inactive" | "sku_conflict" | "success"> => {

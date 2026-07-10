@@ -204,16 +204,15 @@ export const addNewProduct = async(body: PostProductBody): Promise<boolean> => {
 
 // Detail Method from here
 export const findSingleProduct = async(uuid: string): Promise<IProductDetail | null> => {
-    console.log(`SELECT P.id, P.uuid, P.name, P.sku, P.category, P.cost_price, P.sell_price, P.tax, P.weight, P.min_qty, P.max_qty, P.status, P.created_at, P.updated_at, I.available_stock, I.reserved_stock ${PRODUCT_INVENTORY_SQL} where P.uuid = $1`);
     const { rows } = await pool.query(`SELECT P.id, P.uuid, P.name, P.sku, P.category, P.cost_price, P.sell_price, P.tax, P.weight, P.min_qty, P.max_qty, P.status, P.created_at, P.updated_at, I.available_stock, I.reserved_stock ${PRODUCT_INVENTORY_SQL} where P.uuid = $1`, [uuid]);
     return rows.length > 0 ?  rowToProductDetail(rows[0]!) : null
 }
 
 // Delete Method from here
-export const setProductInactive = async (uuid: string): Promise<void> => {
+export const setProductStatus = async (uuid: string, status: ProductStatus): Promise<void> => {
     await pool.query(
         `UPDATE products SET status = $1, updated_at = NOW() WHERE uuid = $2`,
-        [ProductStatus.INACTIVE, uuid]
+        [status, uuid]
     );
 };
 
