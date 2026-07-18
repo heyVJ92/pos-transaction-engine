@@ -121,11 +121,12 @@ export const findSingleCounter = async(uuid: string): Promise<ICounter | null> =
 }
 
 // Delete Method from here
-export const setCounterInactive = async (uuid: string): Promise<void> => {
-    await pool.query(
+export const setCounterInactive = async (uuid: string): Promise<boolean> => {
+    const result = await pool.query(
         `UPDATE counters SET status = $1, updated_at = NOW() WHERE uuid = $2`,
         [CounterStatus.INACTIVE, uuid]
     );
+    return (result.rowCount ?? 0) > 0;
 };
 
 
@@ -158,17 +159,15 @@ const buildUpdateSql = (body: UpdateCounterBody): { sql: string; values: unknown
     };
 };
 
-export const updateCounter = async(uuid: string, body: UpdateCounterBody): Promise<void> => {
+export const updateCounter = async(uuid: string, body: UpdateCounterBody): Promise<boolean> => {
     const {sql, values} = buildUpdateSql(body);
-    // Reactivating (status: "active") is the one update allowed on an already-inactive row, so the
-    // guard flips: require the row to currently be inactive instead of active. Every other update
-    // (rename, re-code, or no-op) still requires the row to currently be active.
     const isReactivating = body.status === CounterStatus.ACTIVE;
     const guardStatus = isReactivating ? CounterStatus.INACTIVE : CounterStatus.ACTIVE;
     try {
-        await pool.query(`UPDATE counters SET ${sql} where uuid = $${values.length+1} and status = $${values.length+2} RETURNING uuid`, [...values, uuid, guardStatus]);
+        const result = await pool.query(`UPDATE counters SET ${sql} where uuid = $${values.length+1} and status = $${values.length+2} RETURNING uuid`, [...values, uuid, guardStatus]);
+        return (result.rowCount ?? 0) > 0;
     } catch (err) {
-        handleDbError(err); // converts PG error → DatabaseError
-        throw err;          // unreachable, satisfies TypeScript
+        handleDbError(err); 
+        throw err;
     }
 }

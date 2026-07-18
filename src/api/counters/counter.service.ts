@@ -37,9 +37,9 @@ export const removeCounter = async (uuid: string): Promise<"not_found" | "alread
     if (!counter) return "not_found";
     if (counter.status === CounterStatus.INACTIVE) return "already_inactive";
 
-    await setCounterInactive(uuid);
+    const result = await setCounterInactive(uuid);
 
-    return "success";
+    return result ? "success" : "not_found";
 };
 
 export const updateCounterByUUID = async (uuid: string, body: UpdateCounterBody): Promise<"not_found" | "already_inactive" | "code_conflict" | "success"> => {
@@ -52,8 +52,8 @@ export const updateCounterByUUID = async (uuid: string, body: UpdateCounterBody)
     if (counter.status === CounterStatus.INACTIVE && !isReactivating) return "already_inactive";
 
     try {
-        await updateCounter(uuid, body);
-        return "success";
+        const result = await updateCounter(uuid, body);
+        return result ? "success" : "not_found";
     } catch (err) {
         if(err instanceof DatabaseError && err.code === "UNIQUE_VIOLATION"){
             return "code_conflict";

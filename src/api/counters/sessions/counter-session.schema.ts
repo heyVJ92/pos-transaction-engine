@@ -4,8 +4,8 @@ import { CounterSessionStatus } from "../../../db/models/counter_session.model.j
 
 // Get Query Schema
 export const getCounterSessionQuerySchema = z.object({
-    counterUuid: z.string().optional(),
-    userUuid: z.string().optional(),
+    counterUuid: z.uuid().optional(),
+    userUuid: z.uuid().optional(),
     status: z.enum(CounterSessionStatus).optional(),
     page: z.coerce.number().int().min(1).max(100).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(10),
@@ -17,15 +17,15 @@ export type GetCounterSessionQuery = z.infer<typeof getCounterSessionQuerySchema
 
 // Post body schema — client always sends uuid, service resolves to internal id (API_PATTERNS.md §12)
 export const addCounterSessionBodySchema = z.object({
-    counterUuid: z.string(),
-    userUuid: z.string(),
+    counterUuid: z.uuid(),
+    userUuid: z.uuid(),
     openingBalance: z.coerce.number().default(0),
 })
 
 export type PostCounterSessionBody = z.infer<typeof addCounterSessionBodySchema>
 
 export const uuidParamSchema = z.object({
-    uuid: z.string()
+    uuid: z.uuid()
 })
 
 // update body schema
