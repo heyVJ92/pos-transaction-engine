@@ -27,7 +27,7 @@ export const restockInventory = async(product_uuid: string, reqBody: RestockBody
     const product = await findSingleProduct(product_uuid);
     if(!product) return "NOT_FOUND";
     const restock = await restockInventoryStock(product.id, reqBody)
-    return "SUCCESS";
+    return restock ? "SUCCESS" : "NOT_FOUND";
 }
 
 

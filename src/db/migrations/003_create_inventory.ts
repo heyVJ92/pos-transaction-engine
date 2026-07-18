@@ -3,8 +3,9 @@ export const up = `
         id SERIAL PRIMARY KEY,
         uuid UUID DEFAULT gen_random_uuid() UNIQUE NOT NULL,
         product_id INTEGER NOT NULL UNIQUE REFERENCES products(id) ON DELETE RESTRICT,
-        available_stock NUMERIC(10) NOT NULL CHECK (available_stock >= 0),
-        reserved_stock NUMERIC(10) NOT NULL CHECK (reserved_stock >= 0),
+        available_stock NUMERIC(10) NOT NULL DEFAULT 0 CHECK (available_stock >= 0),
+        reserved_stock NUMERIC(10) NOT NULL DEFAULT 0 CHECK (reserved_stock >= 0),
+        soft_reserved NUMERIC(10) NOT NULL DEFAULT 0 CHECK (soft_reserved >= 0),
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );

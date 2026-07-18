@@ -143,13 +143,20 @@ export const restockInventoryStock = async(productId: number, reqBody: RestockBo
             'SELECT available_stock FROM inventory WHERE product_id = $1 FOR UPDATE',
             [productId]
         );
+        if (!inventory.rows[0]) {
+            await client.query("ROLLBACK");
+            return false; // inventory not found
+        }
         const stockBefore = Number(inventory.rows[0]?.available_stock ?? 0);
 
         // 2. update stock
-        await client.query(RESTOCK_INVENTORY_SQL, [productId, quantity]);
-
+        const updateResult = await client.query(RESTOCK_INVENTORY_SQL, [productId, quantity]);
+        if ((updateResult.rowCount ?? 0) === 0) {
+            await client.query("ROLLBACK");
+            return false;
+        }
         // 3. insert movement WITH before/after
-        await client.query(
+         await client.query(
             `INSERT INTO inventory_movement 
             (product_id, quantity, movement_type, stock_before, stock_after, unit_cost)
             VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -247,12 +254,6 @@ export const getAllInventoryMovementByProductId = async(productId: number, param
     const sortOrder = params.order ?? "desc";
     const offset    = (params.page - 1) * params.limit;
     
-    console.log("where", `${MOVEMENT_SELECT_COLUMN} ${MOVEMENT_JOIN} ${where} 
-        ORDER BY IM.created_at ${sortOrder.toUpperCase()}
-        LIMIT $${nextIndex} OFFSET $${nextIndex + 1}
-    `);
-
-    console.log("values", values);
     const countSql = `SELECT COUNT(*) AS total ${MOVEMENT_JOIN} ${where}`;
     const dataSql  = `${MOVEMENT_SELECT_COLUMN} ${MOVEMENT_JOIN} ${where} 
         ORDER BY IM.created_at ${sortOrder.toUpperCase()}

@@ -36,8 +36,8 @@ export const changeStatusOfProduct = async (uuid: string): Promise<"not_found" |
     if (!product) return "not_found";
     const updateStatus = product.status === ProductStatus.INACTIVE ? ProductStatus.ACTIVE : ProductStatus.INACTIVE;
 
-    await setProductStatus(uuid, updateStatus);
-
+    const updated = await setProductStatus(uuid, updateStatus);
+    if(!updated) return "not_found"
     return updateStatus === ProductStatus.ACTIVE ? "activated" : "deactivated";
 };
 
@@ -51,8 +51,8 @@ export const updateProductByUUID = async (uuid: string, body: UpdateProductBody)
     const updateBody = sku !== undefined && sku === product.sku ? rest : body;
 
     try {
-        await updateProduct(uuid, updateBody);
-        return "success";
+        const updated = await updateProduct(uuid, updateBody);
+        return updated ? "success" : "not_found";
     } catch (err) {
         if(err instanceof DatabaseError && err.code === "UNIQUE_VIOLATION"){
             return "sku_conflict";

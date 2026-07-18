@@ -7,7 +7,6 @@ import type { IInventoryMovementPublic } from "../../db/models/inventory_movemen
 
 export const listInventoriesHandler = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
     const query = res.locals["validatedQuery"];
-    console.log("----------------------------->", req.url);
     const {data, ...metaData} = await getAllInventoris(query);
     const inventoryPublicData: IInventoryPublic[] = data.map(({id, productId, ...rest}) => rest);
     sendPaginated(
@@ -19,7 +18,7 @@ export const listInventoriesHandler = async(req: Request, res: Response, next: N
 }
 
 export const restockHandler = async(req: Request,res: Response,next: NextFunction): Promise<void> => {
-    const product_uuid = res.locals["validatedParams"].uuid;
+    const product_uuid = res.locals["validatedParams"].product_uuid;
     const reqBody = res.locals["validatedBody"] as RestockBody;
     const result = await restockInventory(product_uuid, reqBody);
     switch(result) {

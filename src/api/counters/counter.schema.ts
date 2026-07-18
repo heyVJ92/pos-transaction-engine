@@ -23,7 +23,7 @@ export const addCounterBodySchema = z.object({
 export type PostCounterBody = z.infer<typeof addCounterBodySchema>
 
 export const uuidParamSchema = z.object({
-    uuid: z.string()
+    uuid: z.uuid()
 })
 
 // update body schema

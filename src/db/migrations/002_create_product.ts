@@ -10,6 +10,8 @@ export const up = `
         category product_category NOT NULL,
         cost_price NUMERIC(10, 2) NOT NULL,
         sell_price NUMERIC(10, 2) NOT NULL,
+        min_qty NUMERIC(10) NOT NULL DEFAULT 0 CHECK (min_qty >= 0),
+        max_qty NUMERIC(10) CHECK (max_qty >= 0),
         tax NUMERIC(5, 2) NOT NULL DEFAULT 0,
         weight NUMERIC(10, 3),
         status product_status NOT NULL DEFAULT 'active',

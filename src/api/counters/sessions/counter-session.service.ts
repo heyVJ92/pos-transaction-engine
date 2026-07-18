@@ -48,9 +48,9 @@ export const removeCounterSession = async (uuid: string): Promise<"not_found" | 
     if (!counterSession) return "not_found";
     if (counterSession.status === CounterSessionStatus.CLOSED) return "already_inactive";
 
-    await setCounterSessionClosed(uuid);
+    const result = await setCounterSessionClosed(uuid);
 
-    return "success";
+    return result ? "success" : "not_found";
 };
 
 export const updateCounterSessionByUUID = async (uuid: string, body: UpdateCounterSessionBody): Promise<"not_found" | "already_inactive" | "success"> => {
@@ -58,6 +58,6 @@ export const updateCounterSessionByUUID = async (uuid: string, body: UpdateCount
     if (!counterSession) return "not_found";
     if (counterSession.status === CounterSessionStatus.CLOSED) return "already_inactive";
 
-    await updateCounterSession(uuid, body);
-    return "success";
+    const result = await updateCounterSession(uuid, body);
+    return result ? "success" : "not_found";
 };

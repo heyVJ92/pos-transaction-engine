@@ -173,11 +173,12 @@ export const findSingleCounterSession = async(uuid: string): Promise<ICounterSes
 }
 
 // Delete (close) Method from here
-export const setCounterSessionClosed = async (uuid: string): Promise<void> => {
-    await pool.query(
+export const setCounterSessionClosed = async (uuid: string): Promise<boolean> => {
+    const result = await pool.query(
         `UPDATE counter_sessions SET status = $1, closed_at = NOW(), updated_at = NOW() WHERE uuid = $2`,
         [CounterSessionStatus.CLOSED, uuid]
     );
+    return (result.rowCount ?? 0) > 0;
 };
 
 
@@ -208,10 +209,11 @@ const buildUpdateSql = (body: UpdateCounterSessionBody): { sql: string; values: 
     };
 };
 
-export const updateCounterSession = async(uuid: string, body: UpdateCounterSessionBody): Promise<void> => {
+export const updateCounterSession = async(uuid: string, body: UpdateCounterSessionBody): Promise<boolean> => {
     const {sql, values} = buildUpdateSql(body);
     try {
-        await pool.query(`UPDATE counter_sessions SET ${sql} where uuid = $${values.length+1} and status = $${values.length+2} RETURNING uuid`, [...values, uuid, CounterSessionStatus.OPEN]);
+       const result =  await pool.query(`UPDATE counter_sessions SET ${sql} where uuid = $${values.length+1} and status = $${values.length+2} RETURNING uuid`, [...values, uuid, CounterSessionStatus.OPEN]);
+    return (result.rowCount ?? 0) > 0
     } catch (err) {
         handleDbError(err); // converts PG error → DatabaseError
         throw err;          // unreachable, satisfies TypeScript

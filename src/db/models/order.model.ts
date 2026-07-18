@@ -1,4 +1,5 @@
 export enum OrderStatus {
+    DRAFT = "draft",
     HOLD = "hold",
     COMPLETED = "completed",
     INPROCESS = "in_process",
@@ -6,12 +7,20 @@ export enum OrderStatus {
     EXPIRED = "expired"
 }
 
-export interface IOrder {
+export interface IOrderList {
     id: number;
     uuid: string;
-    userId: number;
+    cashier: {
+        uuid: string;
+        firstName: string;
+        lastName: string;
+    },
+    counter: {
+        uuid: string;
+        name: string;
+        code: string;
+    },
     orderNumber: string;
-    counterSessionId: number;
     discount: number;
     subTotal: number;
     tax: number;
@@ -21,4 +30,18 @@ export interface IOrder {
     updatedAt: Date;
 }
 
-export type IOrderPublic = Omit<IOrder, "id">;
+export interface IOrderDetail extends IOrderList{
+    items: {
+        uuid: string;
+        name: string;
+        sku: String;
+        quantity: number;
+        price: number,
+        tax: number
+    }
+}
+
+export type IOrderListPublic = Omit<IOrderList, "id">;
+
+export type IOrderDetailPublic = Omit<IOrderDetail, "id">;
+

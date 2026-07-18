@@ -209,11 +209,12 @@ export const findSingleProduct = async(uuid: string): Promise<IProductDetail | n
 }
 
 // Delete Method from here
-export const setProductStatus = async (uuid: string, status: ProductStatus): Promise<void> => {
-    await pool.query(
+export const setProductStatus = async (uuid: string, status: ProductStatus): Promise<boolean> => {
+    const result = await pool.query(
         `UPDATE products SET status = $1, updated_at = NOW() WHERE uuid = $2`,
         [status, uuid]
     );
+    return (result.rowCount ?? 0) > 0
 };
 
 
@@ -252,10 +253,11 @@ const buildUpdateSql = (body: UpdateProductBody): { sql: string; values: unknown
     };
 };
 
-export const updateProduct = async(uuid: string, reqBody: UpdateProductBody): Promise<void> => {
+export const updateProduct = async(uuid: string, reqBody: UpdateProductBody): Promise<boolean> => {
     const {sql, values} = buildUpdateSql(reqBody);
     try {
         const result = await pool.query(`UPDATE products SET ${sql} where uuid = $${values.length+1} and status = $${values.length+2} RETURNING uuid`, [...values, uuid, ProductStatus.ACTIVE]);
+        return (result.rowCount ?? 0) > 0
     } catch (err) {
         handleDbError(err); // converts PG errors to DatabaseError
         throw err;

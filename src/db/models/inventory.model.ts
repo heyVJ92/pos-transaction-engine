@@ -1,4 +1,3 @@
-import { omit } from "zod/mini";
 import type { ProductCategory, ProductStatus } from "./product.model.js";
 
 export interface IInventory {
@@ -18,6 +17,7 @@ export interface IInventory {
     };
     availableStock : number;
     reservedStock: number;
+    soft_reserved: number;
     createdAt : Date;
     updatedAt: Date;
 }
