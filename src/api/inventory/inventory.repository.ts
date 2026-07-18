@@ -1,10 +1,10 @@
 import type { PoolClient } from "pg";
 import { pool } from "../../config/database.js";
-import type { IInventory } from "../../db/models/inventory.model.js";
 import { MovementType, type IInventoryMovement, type IInventoryMovementPublic } from "../../db/models/inventory_movement.model.js";
-import type { ProductCategory, ProductStatus } from "../../db/models/product.model.js";
 import { handleDbError } from "../../utils/db-errors.js";
 import type { GetInventoryQuery, InventoryMovementQueryBody, RestockBody } from "./inventory.schema.js";
+import type { ProductCategory, ProductStatus } from "../../db/models/product.model.js";
+import type { IInventory } from "../../db/models/inventory.model.js";
 
 interface InventoryRow {
     id:         number;

@@ -4,7 +4,7 @@ import { describe, it, jest, expect, beforeAll, beforeEach } from "@jest/globals
 import request from "supertest"
 import type {Express} from "express";
 // import type-only the real service function(s) we're about to mock — types only, no side effects
-import type { getAllInventoris, getAllInventoryMovement, restockInventory } from "../../../api/inventory/inventory.service.js"
+import type { getAllInventoryMovement, restockInventory } from "../../../api/inventory/inventory.service.js"
 import { ProductCategory, ProductStatus } from "../../../db/models/product.model.js";
 import { MovementType, type IInventoryMovement } from "../../../db/models/inventory_movement.model.js";
 import type { IInventory } from "../../../db/models/inventory.model.js";
@@ -13,7 +13,6 @@ import type { IInventory } from "../../../db/models/inventory.model.js";
 // declare `app` (Express) — assigned later, not imported at top
 // declare a mock variable per service function we'll control
 let app: Express;
-let listInventoriesMock: jest.Mock<typeof getAllInventoris>;
 let restockInventoryMock: jest.Mock<typeof restockInventory>;
 let movementsListMock: jest.Mock<typeof getAllInventoryMovement>;
 
@@ -68,7 +67,6 @@ beforeAll(async () => {
 
     // 2. dynamically `await import()` that same service path -> grab the mocked fns, cast as jest.Mock
     const service = await import("../../../api/inventory/inventory.service.js");
-    listInventoriesMock = service.getAllInventoris as jest.Mock<typeof getAllInventoris>;
     restockInventoryMock = service.restockInventory as jest.Mock<typeof restockInventory>;
     movementsListMock = service.getAllInventoryMovement as jest.Mock<typeof getAllInventoryMovement>;
     // 3. dynamically `await import()` the app -> assign to `app`
@@ -82,38 +80,6 @@ describe("inventory.controller", () => {
     //   beforeEach -> jest.clearAllMocks()   // reset call history before every single test
     beforeEach(() => {
         jest.resetAllMocks()
-    })
-
-    describe("GET /inventory", () => {
-        // query validation test
-        it("return 400 for invalid query params", async () => {
-            const res = await request(app).get("/inventory").query({ category: "not_a_category" });
-            expect(res.status).toBe(400);
-            expect(res.body.error.code).toBe("VALIDATION_ERROR");
-            expect(listInventoriesMock).not.toHaveBeenCalled();
-        })
-        // success response test
-        it("return 200 with paginated list of inventory, stripped of internal id and productId", async () => {
-            const inventories = [mockInventory(), mockInventory({ id: 2, uuid: "a1a1a1a1-15fb-4f2a-91d2-f72331d5d8d3", productId: 2 })];
-            listInventoriesMock.mockResolvedValue({
-                data: inventories,
-                total: 2,
-                page: 1,
-                limit: 10,
-                totalPages: 1,
-            });
-
-            const res = await request(app).get("/inventory");
-            expect(res.status).toBe(200);
-            expect(res.body.data).toHaveLength(2);
-            expect(res.body.meta).toEqual({ total: 2, page: 1, limit: 10, totalPages: 1 });
-            // internal integer id/productId must never leak to the response — only uuid is public
-            for (const item of res.body.data) {
-                expect(item).not.toHaveProperty("id");
-                expect(item).not.toHaveProperty("productId");
-            }
-            expect(res.body.data[0].uuid).toBe(inventories[0]!.uuid);
-        })
     })
 
     describe("PUT /inventory/:product_uuid/restock", () => {

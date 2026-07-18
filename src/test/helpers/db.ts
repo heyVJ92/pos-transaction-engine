@@ -1,5 +1,8 @@
 import { pool } from "../../config/database.js";
 import { IDEMPOTENCY_OPERATION, type IdempotencyStatus } from "../../db/models/idempotency.model.js";
+import { SALT_ROUNDS } from "../../utils/constants.js";
+import bcrypt from "bcrypt"
+
 
 /**
  * Wipes every table this test suite touches and resets identity sequences,
@@ -34,9 +37,10 @@ export interface BaseFixtures {
  * inventory row set to `availableStock`.
  */
 export const seedBaseFixtures = async (availableStock: number): Promise<BaseFixtures> => {
+    const hashedPassword = await bcrypt.hash('TEST_USER', SALT_ROUNDS)
     const { rows: userRows } = await pool.query<{ id: number }>(
-        `INSERT INTO users (first_name, last_name, email, role)
-         VALUES ('Test', 'Cashier', 'race-test-cashier@test.local', 'cashier')
+        `INSERT INTO users (first_name, last_name, email, role, password_hash)
+         VALUES ('Test', 'Cashier', 'race-test-cashier@test.local', 'cashier', '${hashedPassword}')
          RETURNING id`
     );
     const userId = userRows[0]!.id;
