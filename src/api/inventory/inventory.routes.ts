@@ -1,15 +1,9 @@
 import { Router } from "express";
 import { validateQuery } from "../../middlewares/validate.js";
-import {getInventoryQuerySchema, uuidParamSchema, restockBodySchema, inventoryMovementQuerySchema} from "./inventory.schema.js";
-import {listInventoriesHandler, restockHandler, movementsListHandler} from "./inventory.controller.js"
+import {uuidParamSchema, restockBodySchema, inventoryMovementQuerySchema} from "./inventory.schema.js";
+import {restockHandler, movementsListHandler} from "./inventory.controller.js"
 
 const inventoryRouter = Router();
-
-inventoryRouter.get(
-    "/", 
-    validateQuery(getInventoryQuerySchema, "query"),
-    listInventoriesHandler
-)
 
 inventoryRouter.put(
     "/:product_uuid/restock", 

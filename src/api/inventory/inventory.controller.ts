@@ -1,21 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
-import { getAllInventoris, getAllInventoryMovement, restockInventory } from "./inventory.service.js"
+import { getAllInventoryMovement, restockInventory } from "./inventory.service.js"
 import { sendError, sendPaginated, sendSuccess } from "../../utils/response.js";
-import type { IInventoryPublic } from "../../db/models/inventory.model.js";
 import type { InventoryMovementQueryBody, RestockBody } from "./inventory.schema.js";
 import type { IInventoryMovementPublic } from "../../db/models/inventory_movement.model.js";
-
-export const listInventoriesHandler = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const query = res.locals["validatedQuery"];
-    const {data, ...metaData} = await getAllInventoris(query);
-    const inventoryPublicData: IInventoryPublic[] = data.map(({id, productId, ...rest}) => rest);
-    sendPaginated(
-        res,
-        "Inventory List succussfully fetched.",
-        inventoryPublicData,
-        metaData
-    )
-}
 
 export const restockHandler = async(req: Request,res: Response,next: NextFunction): Promise<void> => {
     const product_uuid = res.locals["validatedParams"].product_uuid;
