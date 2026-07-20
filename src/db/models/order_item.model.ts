@@ -1,3 +1,5 @@
+import type { OrderStatus } from "./order.model.js";
+
 export interface IOrderItem {
     id: number;
     uuid: string;

@@ -137,6 +137,14 @@ export const findSingleOrder = async(uuid: string): Promise<{id: number, status:
     return rows.length > 0 ?  rows[0] : null
 }
 
+export const updateOrderStatus = async (order_id: number, status: OrderStatus): Promise<{uuid: string, status: OrderStatus}> => {
+    const { rows } = await pool.query(
+        `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING uuid, status`,
+        [status, order_id]
+    );
+    return rows[0]
+}
+
 
 interface ItemAddRow {
     uuid: string,
@@ -339,6 +347,400 @@ export const removeItemTransaction = async (
             tax: Number(orderRow.tax),
             orderTotal: Number(orderRow.order_total)
         };
+
+    } catch (err) {
+        await client.query("ROLLBACK");
+        handleDbError(err);
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
+// ─── Row type ────────────────────────────────────────────────────────────────
+// Order detial = all the common data for order
+interface OrderDetailRow {
+    // order fields (same on every row)
+    id:                  number;
+    uuid:                string;
+    order_number:        string;
+    status:              string;
+    discount:            string;
+    sub_total:           string;
+    tax:                 string;
+    total:               string;
+    created_at:          Date;
+    updated_at:          Date;
+    
+    // cashier fields (same on every row)
+    cashier_uuid:        string;
+    cashier_first_name:  string;
+    cashier_last_name:   string;
+    
+    // counter fields (same on every row)
+    counter_uuid:        string;
+    counter_name:        string;
+    counter_code:        string;
+}
+
+// Item row = item related data where separate for each item
+interface ItemRow {
+    // item fields (different on each row — one per item)
+    item_uuid:           string | null;  // null if order has no items
+    item_quantity:       number | null;
+    item_sell_price:     string | null;
+    item_cost_price:     string | null;
+    item_tax:            string | null;
+
+    // product fields per item (different on each row)
+    product_uuid:        string | null;
+    product_name:        string | null;
+    product_sku:         string | null;
+}
+
+
+// ─── Row mapper ──────────────────────────────────────────────────────────────
+// Multiple rows → single IOrderDetail object
+// This is the key pattern: collapse repeated order data, build items array
+const rowsToOrderDetail = (orderDetail: OrderDetailRow, itemRows: ItemRow[]): IOrderDetail => {
+    return {
+        id:          orderDetail.id,
+        uuid:        orderDetail.uuid,
+        orderNumber: orderDetail.order_number,
+        status:      orderDetail.status as OrderStatus,
+        discount:    Number(orderDetail.discount),
+        subTotal:    Number(orderDetail.sub_total),
+        tax:         Number(orderDetail.tax),
+        total:       Number(orderDetail.total),
+        createdAt:   orderDetail.created_at,
+        updatedAt:   orderDetail.updated_at,
+
+        cashier: {
+            uuid:      orderDetail.cashier_uuid,
+            firstName: orderDetail.cashier_first_name,
+            lastName:  orderDetail.cashier_last_name,
+        },
+
+        counter: {
+            uuid: orderDetail.counter_uuid,
+            name: orderDetail.counter_name,
+            code: orderDetail.counter_code,
+        },
+
+        // map each row to one item
+        // filter out null item_uuid — handles empty orders (no items yet)
+        items: itemRows
+            .filter(r => r.item_uuid !== null)
+            .map(r => ({
+                uuid:      r.item_uuid!,
+                quantity:  r.item_quantity!,
+                sellPrice: Number(r.item_sell_price),
+                costPrice: Number(r.item_cost_price),
+                tax:       Number(r.item_tax),
+                total:     r.item_quantity! * Number(r.item_sell_price),
+                product: {
+                    uuid: r.product_uuid!,
+                    name: r.product_name!,
+                    sku:  r.product_sku!,
+                }
+            }))
+    };
+};
+
+// ─── SQL ─────────────────────────────────────────────────────────────────────
+// LEFT JOIN order_items — keeps order even if no items yet (DRAFT with nothing scanned)
+// INNER JOIN products — only needed when item exists (safe because LEFT JOIN)
+const FIND_ORDER_DETAIL_SQL = `
+    SELECT
+        -- order
+        O.id,
+        O.uuid,
+        O.order_number,
+        O.status,
+        O.discount,
+        O.sub_total,
+        O.tax,
+        O.total,
+        O.created_at,
+        O.updated_at,
+
+        -- cashier
+        U.uuid        AS cashier_uuid,
+        U.first_name  AS cashier_first_name,
+        U.last_name   AS cashier_last_name,
+
+        -- counter
+        C.uuid        AS counter_uuid,
+        C.name        AS counter_name,
+        C.code        AS counter_code,
+
+    FROM orders O
+    INNER JOIN users U
+        ON U.id = O.user_id
+    INNER JOIN counter_sessions CS
+        ON CS.id = O.counter_session_id
+    INNER JOIN counters C
+        ON C.id = CS.counter_id
+    WHERE O.uuid = $1
+    ORDER BY OI.created_at ASC  -- items in scan order
+`;
+
+const FIND_ITEMS_SQL = `
+    SELECT
+        -- item (nullable — LEFT JOIN)
+        OI.uuid       AS item_uuid,
+        OI.quantity   AS item_quantity,
+        OI.sell_price AS item_sell_price,
+        OI.cost_price AS item_cost_price,
+        OI.tax        AS item_tax,
+
+        -- product per item (nullable — LEFT JOIN)
+        P.uuid        AS product_uuid,
+        P.name        AS product_name,
+        P.sku         AS product_sku
+
+    FROM order_items OI
+    INNER JOIN orders O
+        ON OI.order_id = O.id
+    LEFT JOIN products P
+        ON P.id = OI.product_id
+    WHERE O.uuid = $1
+    ORDER BY OI.created_at ASC  -- items in scan order
+`;
+
+// ─── Repository function ─────────────────────────────────────────────────────
+export const findOrderByUuid = async (uuid: string): Promise<IOrderDetail | null> => {
+    const [orderResult, itemsResult] = await Promise.all([
+        pool.query<OrderDetailRow>(
+            FIND_ORDER_DETAIL_SQL,
+            [uuid]
+        ),
+        pool.query<ItemRow>(
+            FIND_ITEMS_SQL,
+            [uuid]
+        )
+    ])
+    if (orderResult.rows.length === 0) return null;
+
+    const order = orderResult.rows[0]!;
+    const items = itemsResult.rows;
+
+    return rowsToOrderDetail(order, items)
+};
+
+export const cancelOrderById = async (
+    orderUuid: string
+): Promise<"not_found" | "cannot_cancel" | "success"> => {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        // 1. lock order + get current status
+        const orderResult = await client.query<{ id: number; status: OrderStatus }>(
+            `SELECT id, status FROM orders WHERE uuid = $1 FOR UPDATE`,
+            [orderUuid]
+        );
+
+        if (orderResult.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return "not_found";
+        }
+
+        const order = orderResult.rows[0]!;
+        const cancellable = [
+            OrderStatus.DRAFT,
+            OrderStatus.INPROCESS,
+            OrderStatus.HOLD
+        ];
+
+        if (!cancellable.includes(order.status)) {
+            await client.query("ROLLBACK");
+            return "cannot_cancel";
+        }
+
+        // 2. get all order items
+        const { rows: items } = await client.query<{
+            product_id: number;
+            quantity: number;
+        }>(
+            `SELECT product_id, quantity FROM order_items WHERE order_id = $1`,
+            [order.id]
+        );
+
+        const isDraft = order.status === OrderStatus.DRAFT;
+
+        // 3. restore inventory — parallel per item
+        if (items.length > 0) {
+            await Promise.all(
+                items.map(item =>
+                    client.query(
+                        `UPDATE inventory SET
+                            available_stock = available_stock + $1,
+                            ${isDraft ? 'soft_reserved' : 'reserved_stock'} = 
+                            ${isDraft ? 'soft_reserved' : 'reserved_stock'} - $1,
+                            updated_at = NOW()
+                         WHERE product_id = $2`,
+                        [item.quantity, item.product_id]
+                    )
+                )
+            );
+
+            // 4. movement log — only for hard reserved (not draft)
+            if (!isDraft) {
+                await Promise.all(
+                    items.map(item =>
+                        client.query(
+                            `INSERT INTO inventory_movement 
+                             (product_id, order_id, quantity, movement_type)
+                             VALUES ($1, $2, $3, 'reverted')`,
+                            [item.product_id, order.id, item.quantity]
+                        )
+                    )
+                );
+            }
+        }
+
+        // 5. update order status
+        await client.query(
+            `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`,
+            [OrderStatus.CANCELLED, order.id]
+        );
+
+        await client.query("COMMIT");
+        return "success";
+
+    } catch (err) {
+        await client.query("ROLLBACK");
+        handleDbError(err);
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
+
+// src/api/orders/order.repository.ts
+
+export const processPayment = async (
+    orderUuid: string
+): Promise<"not_found" | "invalid_status" | "success" | "failed"> => {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        // 1. lock order + validate status
+        const { rows: orderRows } = await client.query<{
+            id: number;
+            status: OrderStatus;
+            total: string;
+        }>(
+            `SELECT id, status, total 
+             FROM orders WHERE uuid = $1 FOR UPDATE`,
+            [orderUuid]
+        );
+
+        if (orderRows.length === 0) {
+            await client.query("ROLLBACK");
+            return "not_found";
+        }
+
+        const order = orderRows[0]!;
+
+        if (order.status !== OrderStatus.INPROCESS) {
+            await client.query("ROLLBACK");
+            return "invalid_status";
+        }
+
+        // 2. get all order items
+        const { rows: items } = await client.query<{
+            product_id: number;
+            quantity: number;
+        }>(
+            `SELECT product_id, quantity 
+             FROM order_items WHERE order_id = $1`,
+            [order.id]
+        );
+
+        // 3. simulate payment — 80% success
+        const paymentSuccess = Math.random() < 0.8;
+
+        // 4. insert payment record
+        await client.query(
+            `INSERT INTO payments (order_id, amount, status)
+             VALUES ($1, $2, $3)`,
+            [order.id, Number(order.total), paymentSuccess ? "success" : "failed"]
+        );
+
+        if (paymentSuccess) {
+            // 5a. reduce reserved_stock — stock permanently gone
+            await Promise.all(
+                items.map(item =>
+                    client.query(
+                        `UPDATE inventory SET
+                            reserved_stock = reserved_stock - $1,
+                            updated_at = NOW()
+                         WHERE product_id = $2`,
+                        [item.quantity, item.product_id]
+                    )
+                )
+            );
+
+            // 6a. movement log — CONFIRMED per item
+            await Promise.all(
+                items.map(item =>
+                    client.query(
+                        `INSERT INTO inventory_movement
+                         (product_id, order_id, quantity, movement_type)
+                         VALUES ($1, $2, $3, 'confirmed')`,
+                        [item.product_id, order.id, item.quantity]
+                    )
+                )
+            );
+
+            // 7a. order → COMPLETED
+            await client.query(
+                `UPDATE orders SET status = $1, updated_at = NOW() 
+                 WHERE id = $2`,
+                [OrderStatus.COMPLETED, order.id]
+            );
+
+        } else {
+            // 5b. restore stock — reserved back to available
+            await Promise.all(
+                items.map(item =>
+                    client.query(
+                        `UPDATE inventory SET
+                            available_stock = available_stock + $1,
+                            reserved_stock  = reserved_stock - $1,
+                            updated_at = NOW()
+                         WHERE product_id = $2`,
+                        [item.quantity, item.product_id]
+                    )
+                )
+            );
+
+            // 6b. movement log — REVERTED per item
+            await Promise.all(
+                items.map(item =>
+                    client.query(
+                        `INSERT INTO inventory_movement
+                         (product_id, order_id, quantity, movement_type)
+                         VALUES ($1, $2, $3, 'reverted')`,
+                        [item.product_id, order.id, item.quantity]
+                    )
+                )
+            );
+
+            // 7b. order → CANCELLED
+            await client.query(
+                `UPDATE orders SET status = $1, updated_at = NOW() 
+                 WHERE id = $2`,
+                [OrderStatus.CANCELLED, order.id]
+            );
+        }
+
+        await client.query("COMMIT");
+        return paymentSuccess ? "success" : "failed";
 
     } catch (err) {
         await client.query("ROLLBACK");
