@@ -26,7 +26,7 @@ export const addOrderItemHandler = async(req: Request, res: Response, next: Next
     const itemBody = res.locals["validatedBody"] as ItemOrderDetailBody;
     const response = await addOrderItem(orderUuid, itemBody)
     switch (response.message) {
-        case "ORDER_NOT_FOUND": sendError(res, "Order_NOT_FOUND", "No Order found with this id.", 409);
+        case "ORDER_NOT_FOUND": sendError(res, "ORDER_NOT_FOUND", "No Order found with this id.", 409);
         return;
         case "ORDER_NOT_IN_DRAFT": sendError(res, "ORDER_NOT_IN_DRAFT", "This order is not in progress anymore so can't edit.", 409);
         return;
@@ -96,8 +96,6 @@ export const cancelOrderHandler = async (
             return;
     }
 };
-
-// src/api/orders/order.controller.ts
 
 export const paymentHandler = async (
     req: Request,

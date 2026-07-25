@@ -472,7 +472,7 @@ const FIND_ORDER_DETAIL_SQL = `
         -- counter
         C.uuid        AS counter_uuid,
         C.name        AS counter_name,
-        C.code        AS counter_code,
+        C.code        AS counter_code
 
     FROM orders O
     INNER JOIN users U
@@ -482,7 +482,6 @@ const FIND_ORDER_DETAIL_SQL = `
     INNER JOIN counters C
         ON C.id = CS.counter_id
     WHERE O.uuid = $1
-    ORDER BY OI.created_at ASC  -- items in scan order
 `;
 
 const FIND_ITEMS_SQL = `

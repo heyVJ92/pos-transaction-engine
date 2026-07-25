@@ -37,6 +37,7 @@ interface AddItemSuccessResponse {
         sku: string;
         quantity: number;
         sellPrice: number;
+        costPrice: number;
         total: number;
         orderTotal: number;
         tax: number;
