@@ -17,7 +17,7 @@ export interface IInventory {
     };
     availableStock : number;
     reservedStock: number;
-    soft_reserved: number;
+    softReserved: number;
     createdAt : Date;
     updatedAt: Date;
 }
