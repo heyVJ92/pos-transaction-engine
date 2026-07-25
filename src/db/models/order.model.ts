@@ -31,17 +31,21 @@ export interface IOrderList {
 }
 
 export interface IOrderDetail extends IOrderList{
-    items: {
-        uuid: string;
-        name: string;
-        sku: String;
-        quantity: number;
-        price: number,
-        tax: number
-    }
+        items: {
+            uuid:      string;
+            quantity:  number;
+            sellPrice: number;
+            costPrice: number;
+            tax:       number;
+            total:     number;
+            product: {
+                uuid: string;
+                name: string;
+                sku:  string;
+            };
+        }[];
 }
 
 export type IOrderListPublic = Omit<IOrderList, "id">;
 
 export type IOrderDetailPublic = Omit<IOrderDetail, "id">;
-

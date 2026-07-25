@@ -1,8 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
 import { sendError, sendPaginated, sendSuccess } from "../../utils/response.js";
 import type { createOrderSchemaBody, getOrderListSchemaBody, ItemOrderDetailBody } from "./order.schema.js";
-import {addOrderItem, createDraftOrder, getOrderList, removeOrderItem} from "./order.service.js";
-import type { IOrderListPublic } from "../../db/models/order.model.js";
+import {addOrderItem, cancelOrder, createDraftOrder, getOrderDetails, getOrderList, holdOrder, processOrderPayment, removeOrderItem} from "./order.service.js";
+import type { IOrderDetailPublic, IOrderListPublic } from "../../db/models/order.model.js";
 
 export const createDraftOrderHandler = async (req: Request,res: Response,next: NextFunction): Promise<void> =>{
     const reqBody = res.locals["validatedBody"] as createOrderSchemaBody;
@@ -26,7 +26,7 @@ export const addOrderItemHandler = async(req: Request, res: Response, next: Next
     const itemBody = res.locals["validatedBody"] as ItemOrderDetailBody;
     const response = await addOrderItem(orderUuid, itemBody)
     switch (response.message) {
-        case "ORDER_NOT_FOUND": sendError(res, "Order_NOT_FOUND", "No Order found with this id.", 409);
+        case "ORDER_NOT_FOUND": sendError(res, "ORDER_NOT_FOUND", "No Order found with this id.", 409);
         return;
         case "ORDER_NOT_IN_DRAFT": sendError(res, "ORDER_NOT_IN_DRAFT", "This order is not in progress anymore so can't edit.", 409);
         return;
@@ -53,3 +53,70 @@ export const deleteOrderItemHandler = async(req: Request, res: Response, next: N
         return;
     }
 }
+
+export const holdOrderHandler = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const {uuid: orderUuid} = res.locals["validatedParams"] as {uuid: string};
+    const response = await holdOrder(orderUuid);
+    switch (response.message) {
+        case "ORDER_NOT_HOLDABLE": sendError(res, "ORDER_NOT_HOLDABLE", response.reason, 409);
+        return;
+        case "ORDER_HELD": sendSuccess(res, "Order put on hold.", response.data);
+        return;
+    }
+}
+
+export const getOrderDetailHandler = async (req: Request, res: Response, next: NextFunction) : Promise<void> => {
+        const {uuid: orderUuid} = res.locals["validatedParams"] as {uuid: string};
+        const result = await getOrderDetails(orderUuid);
+        if(!result) {
+            sendError(res, "NOT_FOUND", "No details found for this Order", 404)
+             return;
+            }
+        const {id, ...data} =  result;
+        sendSuccess(res, `Order details fetched successfully.`, data);
+}
+
+export const cancelOrderHandler = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<void> => {
+    const { uuid } = res.locals["validatedParams"];
+    const result = await cancelOrder(uuid);
+
+    switch (result) {
+        case "not_found":
+            sendError(res, "ORDER_NOT_FOUND", "Order not found", 404);
+            return;
+        case "cannot_cancel":
+            sendError(res, "CANNOT_CANCEL", "Order cannot be cancelled in its current status", 409);
+            return;
+        case "success":
+            sendSuccess(res, "Order cancelled successfully.");
+            return;
+    }
+};
+
+export const paymentHandler = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<void> => {
+    const { uuid } = res.locals["validatedParams"];
+    const result = await processOrderPayment(uuid);
+
+    switch (result) {
+        case "not_found":
+            sendError(res, "ORDER_NOT_FOUND", "Order not found", 404);
+            return;
+        case "invalid_status":
+            sendError(res, "INVALID_STATUS", "Order is not awaiting payment", 409);
+            return;
+        case "failed":
+            sendError(res, "PAYMENT_FAILED", "Payment failed. Stock restored.", 402);
+            return;
+        case "success":
+            sendSuccess(res, "Payment successful. Order completed.");
+            return;
+    }
+};
