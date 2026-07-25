@@ -21,6 +21,7 @@ interface InventoryRow {
     product_status: ProductStatus,
     available_stock : number;
     reserved_stock: number;
+    soft_reserved: number;
     created_at:  Date;
     updated_at:  Date;
 }
@@ -36,14 +37,15 @@ const rowToInventory = (row: InventoryRow): IInventory => {
             name: row.name,
             sku: row.sku,
             category: row.category,
-            costPrice: row.cost_price,
-            sellPrice: row.sell_price,
-            tax: row.tax,
-            weight: row.weight,
+            costPrice: Number(row.cost_price),
+            sellPrice: Number(row.sell_price),
+            tax: Number(row.tax),
+            weight: Number(row.weight),
             status: row.product_status,
         },
-        availableStock: row.available_stock,
-        reservedStock: row.reserved_stock,
+        availableStock: Number(row.available_stock),
+        reservedStock: Number(row.reserved_stock),
+        softReserved: Number(row.soft_reserved),
         createdAt: row.created_at,
         updatedAt: row.updated_at
     }
@@ -54,7 +56,7 @@ export interface QueryResult {
     total: number
 }
 
-const INVENTORY_SELECT_COLUMN = `SELECT I.id, I.uuid, I.product_id, P.uuid as product_uuid, P.name, P.sku, P.category as product_category, P.cost_price, P.sell_price, P.tax, P.weight, P.status as product_status, I.available_stock, I.reserved_stock, I.created_at, I.updated_at`;
+const INVENTORY_SELECT_COLUMN = `SELECT I.id, I.uuid, I.product_id, P.uuid as product_uuid, P.name, P.sku, P.category as product_category, P.cost_price, P.sell_price, P.tax, P.weight, P.status as product_status, I.available_stock, I.reserved_stock, I.soft_reserved, I.created_at, I.updated_at`;
 
 const INVENTORY_JOIN_SQL = ` FROM inventory as I INNER JOIN products as P on P.id = I.product_id`;
 
