@@ -15,9 +15,10 @@ interface ProductRow {
     sell_price: number;
     available_stock: number;
     reserved_stock: number;
-    min_qty: number,
-    max_qty: number | null,
-    tax: number,
+    soft_reserved: number;
+    min_qty: number;
+    max_qty: number | null;
+    tax: number;
     status:     string;
     created_at:  Date;
     updated_at:  Date;
@@ -40,6 +41,7 @@ function rowToProductDetail (row: ProductDetailRow): IProductDetail {
     weight:     Number(row.weight),
     availableStock: Number(row.available_stock),
     reservedStock: Number(row.reserved_stock),
+    softReserved: Number(row.soft_reserved),
     minQty:     Number(row.min_qty),
     maxQty:     row.max_qty !== null ? Number(row.max_qty) : null,
     status:     row.status as ProductStatus,
@@ -60,6 +62,7 @@ function rowToProduct (row: ProductRow): IProduct {
     sellPrice:  Number(row.sell_price),
     availableStock: Number(row.available_stock),
     reservedStock: Number(row.reserved_stock),
+    softReserved: Number(row.soft_reserved),
     tax:        Number(row.tax),
     minQty:     Number(row.min_qty),
     maxQty:     row.max_qty !== null ? Number(row.max_qty) : null,
@@ -130,7 +133,7 @@ export async function findManyProducts(params: GetProductQuery): Promise<QueryRe
 
     const countSql = `SELECT COUNT(*) AS total ${PRODUCT_INVENTORY_SQL} ${where}`;
     const dataSql  = `
-        SELECT P.id, P.uuid, P.name, P.sku, P.category, P.cost_price, P.tax, P.sell_price, P.min_qty, P.max_qty, P.status, P.created_at, P.updated_at, I.available_stock, I.reserved_stock
+        SELECT P.id, P.uuid, P.name, P.sku, P.category, P.cost_price, P.tax, P.sell_price, P.min_qty, P.max_qty, P.status, P.created_at, P.updated_at, I.available_stock, I.reserved_stock, I.soft_reserved
         ${PRODUCT_INVENTORY_SQL}
         ${where}
         ORDER BY ${sortCol} ${sortOrder.toUpperCase()}
@@ -204,7 +207,7 @@ export const addNewProduct = async(body: PostProductBody): Promise<boolean> => {
 
 // Detail Method from here
 export const findSingleProduct = async(uuid: string): Promise<IProductDetail | null> => {
-    const { rows } = await pool.query(`SELECT P.id, P.uuid, P.name, P.sku, P.category, P.cost_price, P.sell_price, P.tax, P.weight, P.min_qty, P.max_qty, P.status, P.created_at, P.updated_at, I.available_stock, I.reserved_stock ${PRODUCT_INVENTORY_SQL} where P.uuid = $1`, [uuid]);
+    const { rows } = await pool.query(`SELECT P.id, P.uuid, P.name, P.sku, P.category, P.cost_price, P.sell_price, P.tax, P.weight, P.min_qty, P.max_qty, P.status, P.created_at, P.updated_at, I.available_stock, I.reserved_stock, I.soft_reserved ${PRODUCT_INVENTORY_SQL} where P.uuid = $1`, [uuid]);
     return rows.length > 0 ?  rowToProductDetail(rows[0]!) : null
 }
 
