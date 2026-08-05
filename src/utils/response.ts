@@ -27,12 +27,13 @@ export const sendPaginated = (res: Response, message: string, data: unknown = nu
     })
  }
 
-export const sendError = (res: Response, code: string, message: string, statusCode: number = 400): void => {
+export const sendError = (res: Response, code: string, message: string, statusCode: number = 400, details?: unknown): void => {
     res.status(statusCode).json({
         success: false,
         error: {
             code,
-            message
+            message,
+            ...(details !== undefined ? { details } : {})
         }
     })
 }

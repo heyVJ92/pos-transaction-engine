@@ -1,8 +1,50 @@
 import { pool } from "../../config/database.js";
+import type { PoolClient } from "pg";
 import { OrderStatus, type IOrderDetail, type IOrderList } from "../../db/models/order.model.js"
 import type { IProductDetail } from "../../db/models/product.model.js";
-import { handleDbError } from "../../utils/db-errors.js";
-import type { getOrderListSchemaBody, ItemOrderDetailBody } from "./order.schema.js";
+import { handleDbError, isPostgresError } from "../../utils/db-errors.js";
+import type { getOrderListSchemaBody, ItemOrderDetailBody, PaymentMode } from "./order.schema.js";
+
+interface OrderTotalsRow {
+    order_uuid: string;
+    sub_total: string;
+    tax: string;
+    order_total: string;
+}
+
+interface OrderTotals {
+    orderUuid: string;
+    subTotal: number;
+    tax: number;
+    orderTotal: number;
+}
+
+// shared by every item-level mutation that must recompute order totals inside the same
+// transaction as the mutation itself (add/remove/edit all called this identical block before)
+const recalculateOrderTotals = async (client: PoolClient, order_id: number): Promise<OrderTotals> => {
+    const { rows } = await client.query<OrderTotalsRow>(
+        `UPDATE orders SET
+            sub_total = (
+                SELECT COALESCE(SUM(quantity * sell_price), 0)
+                FROM order_items WHERE order_id = $1
+            ),
+            tax = (
+                SELECT COALESCE(SUM(quantity * (sell_price * tax / 100)), 0)
+                FROM order_items WHERE order_id = $1
+            ),
+            total = sub_total - (sub_total * discount / 100) + tax,
+            updated_at = NOW()
+         WHERE id = $1 RETURNING uuid as order_uuid, sub_total, tax, total as order_total`,
+        [order_id]
+    );
+    const row = rows[0]!;
+    return {
+        orderUuid: row.order_uuid,
+        subTotal: Number(row.sub_total),
+        tax: Number(row.tax),
+        orderTotal: Number(row.order_total)
+    };
+};
 
 
 interface OrderRow {
@@ -57,8 +99,8 @@ export type CreateOrderResult = {
     status: OrderStatus
 }
 
-export const InsertDraftOrder = async (session_id: number, discount: number, user_id: number): Promise<CreateOrderResult> => {
-    const result = await pool.query(`INSERT INTO orders (counter_session_id, discount, user_id, status) VALUES ($1, $2, $3, $4) RETURNING *`, [session_id, discount, user_id, OrderStatus.DRAFT])
+export const InsertDraftOrder = async (session_id: number, user_id: number): Promise<CreateOrderResult> => {
+    const result = await pool.query(`INSERT INTO orders (counter_session_id, user_id, status) VALUES ($1, $2, $3) RETURNING *`, [session_id, user_id, OrderStatus.DRAFT])
 
     const {uuid, order_number, status} = result.rows[0]
     return {
@@ -137,7 +179,12 @@ export const findSingleOrder = async(uuid: string): Promise<{id: number, status:
     return rows.length > 0 ?  rows[0] : null
 }
 
-export const updateOrderStatus = async (order_id: number, status: OrderStatus): Promise<{uuid: string, status: OrderStatus}> => {
+export interface OrderStatusResult {
+    uuid: string;
+    status: OrderStatus;
+}
+
+export const updateOrderStatus = async (order_id: number, status: OrderStatus): Promise<OrderStatusResult> => {
     const { rows } = await pool.query(
         `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING uuid, status`,
         [status, order_id]
@@ -214,36 +261,42 @@ export const addItemTransaction = async (
         await client.query(
             `UPDATE inventory 
              SET available_stock = available_stock - $1,
-                 soft_reserved = soft_reserved + $1,
+                 reserved_stock = reserved_stock + $1,
                  updated_at = NOW()
              WHERE product_id = $2`,
             [itemBody.quantity, product.id]
         );
 
+        console.log(`object`, order_id, product.id, itemBody.quantity, 
+            product.sellPrice, product.costPrice, product.tax);
         // insert order item
         const result = await client.query<ItemAddRow>(
             `INSERT INTO order_items 
-             (order_id, product_id, quantity, sell_price, cost_price, tax)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             RETURNING uuid, quantity, sell_price, cost_price`,
+            (order_id, product_id, quantity, sell_price, cost_price, tax)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (order_id, product_id) 
+            DO UPDATE SET quantity = order_items.quantity + EXCLUDED.quantity
+            RETURNING uuid, quantity, sell_price, cost_price`,
             [order_id, product.id, itemBody.quantity, 
              product.sellPrice, product.costPrice, product.tax]
         );
-
+        console.log("result",result);
         // recalculate order totals
         const orderDetails = await client.query(
-            `UPDATE orders SET
-                sub_total = (
-                    SELECT COALESCE(SUM(quantity * sell_price), 0) 
-                    FROM order_items WHERE order_id = $1
-                ),
-                tax = (
-                    SELECT COALESCE(SUM(quantity * (sell_price * tax / 100)), 0) 
-                    FROM order_items WHERE order_id = $1
-                ),
-                total =  sub_total - (sub_total * discount / 100) + tax,
-                updated_at = NOW()
-             WHERE id = $1 RETURNING uuid as order_uuid, sub_total, tax, total as order_total`,
+            `WITH totals AS (
+            SELECT
+                COALESCE(SUM(quantity * sell_price), 0) AS sub_total,
+                COALESCE(SUM(quantity * (sell_price * tax / 100)), 0) AS tax
+            FROM order_items WHERE order_id = $1
+            )
+            UPDATE orders SET
+            sub_total = totals.sub_total,
+            tax = totals.tax,
+            total = totals.sub_total - (totals.sub_total * orders.discount / 100) + totals.tax,
+            updated_at = NOW()
+            FROM totals
+            WHERE orders.id = $1
+            RETURNING uuid AS order_uuid, orders.sub_total, orders.tax, orders.total AS order_total`,
             [order_id]
         );
 
@@ -252,6 +305,165 @@ export const addItemTransaction = async (
         const row = result.rows[0];
         if (!row) return null;
         return itemAddResult({...row,...orderRow}, product.name, product.sku);
+
+    } catch (err) {
+        await client.query("ROLLBACK");
+        handleDbError(err);
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
+export interface EditItemInsufficientStock {
+    productName: string;
+    sku: string;
+    requested: number;
+    available: number;
+}
+
+export interface ItemEditPublic {
+    uuid: string;
+    productName: string;
+    sku: string;
+    quantity: number;
+    sellPrice: number;
+    costPrice: number;
+    orderUuid: string;
+    subTotal: number;
+    tax: number;
+    orderTotal: number;
+}
+
+export type EditItemTransactionResult =
+    | { outcome: "not_found" }
+    | { outcome: "insufficient_stock"; data: EditItemInsufficientStock }
+    | { outcome: "removed"; data: ItemRemovePublic }
+    | { outcome: "success"; data: ItemEditPublic };
+
+export const editItemTransaction = async (
+    order_id: number,
+    item_uuid: string,
+    newQuantity: number
+): Promise<EditItemTransactionResult> => {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        // lock the order item row first (same lock order as removeItemTransaction),
+        // read its current quantity under lock — the client's view of "current qty" is
+        // never trusted, the delta is always computed from this locked read
+        const itemResult = await client.query<{
+            uuid: string;
+            product_id: number;
+            quantity: number;
+            sell_price: string;
+            cost_price: string;
+            product_name: string;
+            sku: string;
+        }>(
+            `SELECT OI.uuid, OI.product_id, OI.quantity, OI.sell_price, OI.cost_price, P.name as product_name, P.sku
+             FROM order_items OI
+             INNER JOIN products P ON P.id = OI.product_id
+             WHERE OI.uuid = $1 AND OI.order_id = $2
+             FOR UPDATE`,
+            [item_uuid, order_id]
+        );
+
+        const item = itemResult.rows[0];
+        if (!item) {
+            await client.query("ROLLBACK");
+            return { outcome: "not_found" };
+        }
+
+        // 0 means "remove this line" — order_items.quantity has CHECK (quantity > 0),
+        // so this must be a DELETE, not an UPDATE ... SET quantity = 0
+        if (newQuantity === 0) {
+            await client.query(
+                `UPDATE inventory SET
+                    available_stock = available_stock + $1,
+                    reserved_stock = reserved_stock - $1,
+                    updated_at = NOW()
+                 WHERE product_id = $2`,
+                [item.quantity, item.product_id]
+            );
+            await client.query(`DELETE FROM order_items WHERE uuid = $1`, [item_uuid]);
+
+            const totals = await recalculateOrderTotals(client, order_id);
+            await client.query("COMMIT");
+            return {
+                outcome: "removed",
+                data: {
+                    uuid: item.uuid,
+                    productName: item.product_name,
+                    sku: item.sku,
+                    quantity: 0,
+                    orderUuid: totals.orderUuid,
+                    subTotal: totals.subTotal,
+                    tax: totals.tax,
+                    orderTotal: totals.orderTotal
+                }
+            };
+        }
+
+        const delta = newQuantity - item.quantity;
+
+        if (delta !== 0) {
+            const inventory = await client.query<{ available_stock: string }>(
+                `SELECT available_stock FROM inventory WHERE product_id = $1 FOR UPDATE`,
+                [item.product_id]
+            );
+            const available = Number(inventory.rows[0]?.available_stock ?? 0);
+
+            if (delta > 0 && available < delta) {
+                await client.query("ROLLBACK");
+                return {
+                    outcome: "insufficient_stock",
+                    data: {
+                        productName: item.product_name,
+                        sku: item.sku,
+                        requested: newQuantity,
+                        // this line's current qty is already reserved against this order —
+                        // the real ceiling for "requested" is what's free plus what's already held
+                        available: available + item.quantity
+                    }
+                };
+            }
+
+            // one statement handles both directions — a negative delta flips the arithmetic:
+            // available_stock - (-3) = +3 back to available, reserved_stock + (-3) = -3 off reserved
+            await client.query(
+                `UPDATE inventory SET
+                    available_stock = available_stock - $1,
+                    reserved_stock = reserved_stock + $1,
+                    updated_at = NOW()
+                 WHERE product_id = $2`,
+                [delta, item.product_id]
+            );
+        }
+
+        await client.query(
+            `UPDATE order_items SET quantity = $1 WHERE uuid = $2`,
+            [newQuantity, item_uuid]
+        );
+
+        const totals = await recalculateOrderTotals(client, order_id);
+        await client.query("COMMIT");
+        return {
+            outcome: "success",
+            data: {
+                uuid: item.uuid,
+                productName: item.product_name,
+                sku: item.sku,
+                quantity: newQuantity,
+                sellPrice: Number(item.sell_price),
+                costPrice: Number(item.cost_price),
+                orderUuid: totals.orderUuid,
+                subTotal: totals.subTotal,
+                tax: totals.tax,
+                orderTotal: totals.orderTotal
+            }
+        };
 
     } catch (err) {
         await client.query("ROLLBACK");
@@ -309,7 +521,7 @@ export const removeItemTransaction = async (
         await client.query(
             `UPDATE inventory
              SET available_stock = available_stock + $1,
-                 soft_reserved = soft_reserved - $1,
+                 reserved_stock = reserved_stock - $1,
                  updated_at = NOW()
              WHERE product_id = $2`,
             [item.quantity, item.product_id]
@@ -318,34 +530,17 @@ export const removeItemTransaction = async (
         // remove order item
         await client.query(`DELETE FROM order_items WHERE uuid = $1`, [item_uuid]);
 
-        // recalculate order totals
-        const orderDetails = await client.query(
-            `UPDATE orders SET
-                sub_total = (
-                    SELECT COALESCE(SUM(quantity * sell_price), 0)
-                    FROM order_items WHERE order_id = $1
-                ),
-                tax = (
-                    SELECT COALESCE(SUM(quantity * (sell_price * tax / 100)), 0)
-                    FROM order_items WHERE order_id = $1
-                ),
-                total = sub_total - (sub_total * discount / 100) + tax,
-                updated_at = NOW()
-             WHERE id = $1 RETURNING uuid as order_uuid, sub_total, tax, total as order_total`,
-            [order_id]
-        );
-
+        const totals = await recalculateOrderTotals(client, order_id);
         await client.query("COMMIT");
-        const orderRow = orderDetails.rows[0];
         return {
             uuid: item.uuid,
             productName: item.product_name,
             sku: item.sku,
             quantity: item.quantity,
-            orderUuid: orderRow.order_uuid,
-            subTotal: Number(orderRow.sub_total),
-            tax: Number(orderRow.tax),
-            orderTotal: Number(orderRow.order_total)
+            orderUuid: totals.orderUuid,
+            subTotal: totals.subTotal,
+            tax: totals.tax,
+            orderTotal: totals.orderTotal
         };
 
     } catch (err) {
@@ -527,6 +722,121 @@ export const findOrderByUuid = async (uuid: string): Promise<IOrderDetail | null
     return rowsToOrderDetail(order, items)
 };
 
+export const checkoutOrderByUuid = async (
+    orderUuid: string
+): Promise<"not_found" | "not_draft" | "empty_order" | OrderStatusResult> => {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        // lock + validate status inside the transaction (not a pre-check) — avoids the
+        // TOCTOU gap a separate findSingleOrder-then-act sequence would have
+        const orderResult = await client.query<{ id: number; uuid: string; status: OrderStatus }>(
+            `SELECT id, uuid, status FROM orders WHERE uuid = $1 FOR UPDATE`,
+            [orderUuid]
+        );
+
+        const order = orderResult.rows[0];
+        if (!order) {
+            await client.query("ROLLBACK");
+            return "not_found";
+        }
+        if (order.status !== OrderStatus.DRAFT) {
+            await client.query("ROLLBACK");
+            return "not_draft";
+        }
+
+        const { rows: items } = await client.query<{ product_id: number; quantity: number }>(
+            `SELECT product_id, quantity FROM order_items WHERE order_id = $1`,
+            [order.id]
+        );
+
+        if (items.length === 0) {
+            await client.query("ROLLBACK");
+            return "empty_order";
+        }
+
+        // Integrity failsafe, not a gate: reserved_stock should always be >= what this
+        // order itself committed at add-time. A mismatch means something upstream
+        // corrupted the reservation — flag it and let the sale proceed anyway rather than
+        // strand a paying customer over a data-integrity issue that isn't theirs
+        // (docs/order-payment-redesign-review.md §2). Read-only, so no row locks needed —
+        // one batched query instead of locking per item.
+        // TODO: once the audit-trail table exists, write this flag there instead of
+        // console.error — right now nothing reads this log.
+        const productIds = items.map(i => i.product_id);
+        const { rows: inventoryRows } = await client.query<{ product_id: number; reserved_stock: string }>(
+            `SELECT product_id, reserved_stock FROM inventory WHERE product_id = ANY($1::int[])`,
+            [productIds]
+        );
+        const reservedByProduct = new Map(inventoryRows.map(r => [r.product_id, Number(r.reserved_stock)]));
+        for (const item of items) {
+            const reserved = reservedByProduct.get(item.product_id) ?? 0;
+            if (reserved < item.quantity) {
+                console.error(
+                    `[checkout-integrity] order ${order.uuid} product ${item.product_id}: reserved_stock=${reserved} < committed quantity=${item.quantity}`
+                );
+            }
+        }
+
+        const { rows: updated } = await client.query<OrderStatusResult>(
+            `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING uuid, status`,
+            [OrderStatus.INPROCESS, order.id]
+        );
+
+        await client.query("COMMIT");
+        return updated[0]!;
+
+    } catch (err) {
+        await client.query("ROLLBACK");
+        handleDbError(err);
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
+export const revertOrderToDraftByUuid = async (
+    orderUuid: string
+): Promise<"not_found" | "not_in_process" | OrderStatusResult> => {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+
+        const orderResult = await client.query<{ id: number; uuid: string; status: OrderStatus }>(
+            `SELECT id, uuid, status FROM orders WHERE uuid = $1 FOR UPDATE`,
+            [orderUuid]
+        );
+
+        const order = orderResult.rows[0];
+        if (!order) {
+            await client.query("ROLLBACK");
+            return "not_found";
+        }
+        if (order.status !== OrderStatus.INPROCESS) {
+            await client.query("ROLLBACK");
+            return "not_in_process";
+        }
+
+        // pure status flip — items were reserved at add-time, not at checkout, so
+        // checkout never moved any stock and reverting doesn't need to move any back
+        const { rows: updated } = await client.query<OrderStatusResult>(
+            `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING uuid, status`,
+            [OrderStatus.DRAFT, order.id]
+        );
+
+        await client.query("COMMIT");
+        return updated[0]!;
+
+    } catch (err) {
+        await client.query("ROLLBACK");
+        handleDbError(err);
+        throw err;
+    } finally {
+        client.release();
+    }
+};
+
 export const cancelOrderById = async (
     orderUuid: string
 ): Promise<"not_found" | "cannot_cancel" | "success"> => {
@@ -575,8 +885,8 @@ export const cancelOrderById = async (
                     client.query(
                         `UPDATE inventory SET
                             available_stock = available_stock + $1,
-                            ${isDraft ? 'soft_reserved' : 'reserved_stock'} = 
-                            ${isDraft ? 'soft_reserved' : 'reserved_stock'} - $1,
+                            ${isDraft ? 'reserved_stock' : 'reserved_stock'} = 
+                            ${isDraft ? 'reserved_stock' : 'reserved_stock'} - $1,
                             updated_at = NOW()
                          WHERE product_id = $2`,
                         [item.quantity, item.product_id]
@@ -620,129 +930,139 @@ export const cancelOrderById = async (
 
 // src/api/orders/order.repository.ts
 
+export interface PaymentResult {
+    orderUuid: string;
+    orderStatus: OrderStatus;
+    payment: {
+        uuid: string;
+        mode: PaymentMode;
+        amount: number;
+        amountTendered: number;
+        change: number;
+    };
+}
+
 export const processPayment = async (
-    orderUuid: string
-): Promise<"not_found" | "invalid_status" | "success" | "failed"> => {
+    orderUuid: string,
+    mode: PaymentMode,
+    amountTendered: number
+): Promise<"not_found" | "invalid_status" | "insufficient_tender" | "already_paid" | PaymentResult> => {
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
 
-        // 1. lock order + validate status
+        // 1. lock order + validate status — no gateway/decline modeling here (there's no
+        // real payment processor behind this), so the only thing left to validate is tender
         const { rows: orderRows } = await client.query<{
             id: number;
             status: OrderStatus;
             total: string;
         }>(
-            `SELECT id, status, total 
+            `SELECT id, status, total
              FROM orders WHERE uuid = $1 FOR UPDATE`,
             [orderUuid]
         );
 
-        if (orderRows.length === 0) {
+        const order = orderRows[0];
+        if (!order) {
             await client.query("ROLLBACK");
             return "not_found";
         }
-
-        const order = orderRows[0]!;
-
         if (order.status !== OrderStatus.INPROCESS) {
             await client.query("ROLLBACK");
             return "invalid_status";
         }
 
-        // 2. get all order items
+        const total = Number(order.total);
+        if (amountTendered < total) {
+            await client.query("ROLLBACK");
+            return "insufficient_tender";
+        }
+        const change = amountTendered - total;
+
+        // 2. get all order items, sorted by product_id — the sort matters, see the lock below
         const { rows: items } = await client.query<{
             product_id: number;
             quantity: number;
+            cost_price: string;
         }>(
-            `SELECT product_id, quantity 
-             FROM order_items WHERE order_id = $1`,
+            `SELECT product_id, quantity, cost_price
+             FROM order_items WHERE order_id = $1
+             ORDER BY product_id ASC`,
             [order.id]
         );
 
-        // 3. simulate payment — 80% success
-        const paymentSuccess = Math.random() < 0.8;
-
-        // 4. insert payment record
-        await client.query(
-            `INSERT INTO payments (order_id, amount, status)
-             VALUES ($1, $2, $3)`,
-            [order.id, Number(order.total), paymentSuccess ? "success" : "failed"]
-        );
-
-        if (paymentSuccess) {
-            // 5a. reduce reserved_stock — stock permanently gone
-            await Promise.all(
-                items.map(item =>
-                    client.query(
-                        `UPDATE inventory SET
-                            reserved_stock = reserved_stock - $1,
-                            updated_at = NOW()
-                         WHERE product_id = $2`,
-                        [item.quantity, item.product_id]
-                    )
-                )
+        // 3. decrement reserved_stock and log a CONFIRMED movement per line — stock is
+        // permanently gone here, this is the one place inventory_movement still gets
+        // written (docs/decisions.md, 2026-07-30). Locked one product at a time, in
+        // ascending product_id order — this transaction touches every line's inventory
+        // row at once, so a fixed lock order is required to avoid deadlocking against
+        // another concurrent payment/checkout that touches an overlapping set of products.
+        for (const item of items) {
+            const { rows: inventoryRows } = await client.query<{
+                stock_before: string;
+                stock_after: string;
+            }>(
+                `UPDATE inventory
+                 SET reserved_stock = reserved_stock - $1, updated_at = NOW()
+                 WHERE product_id = $2
+                 RETURNING (reserved_stock + $1) AS stock_before, reserved_stock AS stock_after`,
+                [item.quantity, item.product_id]
             );
+            const stock = inventoryRows[0]!;
 
-            // 6a. movement log — CONFIRMED per item
-            await Promise.all(
-                items.map(item =>
-                    client.query(
-                        `INSERT INTO inventory_movement
-                         (product_id, order_id, quantity, movement_type)
-                         VALUES ($1, $2, $3, 'confirmed')`,
-                        [item.product_id, order.id, item.quantity]
-                    )
-                )
-            );
-
-            // 7a. order → COMPLETED
             await client.query(
-                `UPDATE orders SET status = $1, updated_at = NOW() 
-                 WHERE id = $2`,
-                [OrderStatus.COMPLETED, order.id]
-            );
-
-        } else {
-            // 5b. restore stock — reserved back to available
-            await Promise.all(
-                items.map(item =>
-                    client.query(
-                        `UPDATE inventory SET
-                            available_stock = available_stock + $1,
-                            reserved_stock  = reserved_stock - $1,
-                            updated_at = NOW()
-                         WHERE product_id = $2`,
-                        [item.quantity, item.product_id]
-                    )
-                )
-            );
-
-            // 6b. movement log — REVERTED per item
-            await Promise.all(
-                items.map(item =>
-                    client.query(
-                        `INSERT INTO inventory_movement
-                         (product_id, order_id, quantity, movement_type)
-                         VALUES ($1, $2, $3, 'reverted')`,
-                        [item.product_id, order.id, item.quantity]
-                    )
-                )
-            );
-
-            // 7b. order → CANCELLED
-            await client.query(
-                `UPDATE orders SET status = $1, updated_at = NOW() 
-                 WHERE id = $2`,
-                [OrderStatus.CANCELLED, order.id]
+                `INSERT INTO inventory_movement
+                 (product_id, order_id, quantity, stock_before, stock_after, unit_cost, movement_type)
+                 VALUES ($1, $2, $3, $4, $5, $6, 'confirmed')`,
+                [item.product_id, order.id, item.quantity, stock.stock_before, stock.stock_after, item.cost_price]
             );
         }
 
+        // 4. write the payment row — single-tender only for v1. `order_id` is UNIQUE on
+        // this table, so a genuine double-insert for the same order fails cleanly here;
+        // in practice a double-tap never reaches this far, since the status check above
+        // already rejects a second attempt once the first commits (order is no longer
+        // in_process) — this is defense in depth, not the primary guard.
+        const { rows: paymentRows } = await client.query<{
+            uuid: string;
+            mode: PaymentMode;
+            amount: string;
+            amount_tendered: string;
+            change: string;
+        }>(
+            `INSERT INTO payment (order_id, mode, amount, amount_tendered, change)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING uuid, mode, amount, amount_tendered, change`,
+            [order.id, mode, total, amountTendered, change]
+        );
+        const payment = paymentRows[0]!;
+
+        // 5. order → COMPLETED
+        const { rows: updatedOrder } = await client.query<{ uuid: string; status: OrderStatus }>(
+            `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING uuid, status`,
+            [OrderStatus.COMPLETED, order.id]
+        );
+
         await client.query("COMMIT");
-        return paymentSuccess ? "success" : "failed";
+        const orderRow = updatedOrder[0]!;
+        return {
+            orderUuid: orderRow.uuid,
+            orderStatus: orderRow.status,
+            payment: {
+                uuid: payment.uuid,
+                mode: payment.mode,
+                amount: Number(payment.amount),
+                amountTendered: Number(payment.amount_tendered),
+                change: Number(payment.change)
+            }
+        };
 
     } catch (err) {
         await client.query("ROLLBACK");
+        if (isPostgresError(err) && err.code === "23505") {
+            return "already_paid";
+        }
         handleDbError(err);
         throw err;
     } finally {

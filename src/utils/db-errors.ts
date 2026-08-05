@@ -29,6 +29,7 @@ export class DatabaseError extends Error {
 
 export const handleDbError = (err: unknown): never => {
     if (isPostgresError(err)) {
+        console.log(err.stack);
         const code = PG_ERROR_CODES[err.code] ?? "DATABASE_ERROR";
         throw new DatabaseError(code, err.detail);
     }
