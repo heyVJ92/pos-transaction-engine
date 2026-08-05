@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { sendError, sendPaginated, sendSuccess } from "../../utils/response.js";
-import type { createOrderSchemaBody, getOrderListSchemaBody, ItemOrderDetailBody } from "./order.schema.js";
-import {addOrderItem, cancelOrder, createDraftOrder, getOrderDetails, getOrderList, holdOrder, processOrderPayment, removeOrderItem} from "./order.service.js";
+import type { createOrderSchemaBody, EditOrderItemBody, getOrderListSchemaBody, ItemOrderDetailBody, PayOrderBody } from "./order.schema.js";
+import {addOrderItem, cancelOrder, checkoutOrder, createDraftOrder, editOrderItem, getOrderDetails, getOrderList, holdOrder, processOrderPayment, removeOrderItem, revertOrderToDraft} from "./order.service.js";
 import type { IOrderDetailPublic, IOrderListPublic } from "../../db/models/order.model.js";
 
 export const createDraftOrderHandler = async (req: Request,res: Response,next: NextFunction): Promise<void> =>{
@@ -32,9 +32,29 @@ export const addOrderItemHandler = async(req: Request, res: Response, next: Next
         return;
         case "PRODUCT_NOT_FOUND": sendError(res, "PRODUCT_NOT_FOUND", "No Product found with this id.", 409);
         return;
-        case "INSUFFICIENT_STOCK": sendError(res, "INSUFFICIENT_STOCK", "Insufficient Stock", 409);
+        case "INSUFFICIENT_STOCK": sendError(res, "INSUFFICIENT_STOCK", "Insufficient Stock", 409, response.data);
         return;
         case "ITEM_ADDED": sendSuccess(res, "Item added to order.", response.data);
+        return;
+    }
+}
+
+export const editOrderItemHandler = async(req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const {uuid: orderUuid, itemUuid} = res.locals["validatedParams"] as {uuid: string, itemUuid: string};
+    const body = res.locals["validatedBody"] as EditOrderItemBody;
+    const response = await editOrderItem(orderUuid, itemUuid, body)
+    switch (response.message) {
+        case "ORDER_NOT_FOUND": sendError(res, "ORDER_NOT_FOUND", "No Order found with this id.", 409);
+        return;
+        case "ORDER_NOT_IN_DRAFT": sendError(res, "ORDER_NOT_IN_DRAFT", "This order is not in progress anymore so can't edit.", 409);
+        return;
+        case "ITEM_NOT_FOUND": sendError(res, "ITEM_NOT_FOUND", "No item found with this id in the order.", 409);
+        return;
+        case "INSUFFICIENT_STOCK": sendError(res, "INSUFFICIENT_STOCK", "Insufficient Stock", 409, response.data);
+        return;
+        case "ITEM_REMOVED": sendSuccess(res, "Item removed from order.", response.data);
+        return;
+        case "ITEM_EDITED": sendSuccess(res, "Item quantity updated.", response.data);
         return;
     }
 }
@@ -76,6 +96,48 @@ export const getOrderDetailHandler = async (req: Request, res: Response, next: N
         sendSuccess(res, `Order details fetched successfully.`, data);
 }
 
+export const checkoutOrderHandler = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<void> => {
+    const { uuid } = res.locals["validatedParams"];
+    const result = await checkoutOrder(uuid);
+
+    if (result === "not_found") {
+        sendError(res, "ORDER_NOT_FOUND", "Order not found", 404);
+        return;
+    }
+    if (result === "not_draft") {
+        sendError(res, "ORDER_NOT_IN_DRAFT", "Only a draft order can be checked out", 409);
+        return;
+    }
+    if (result === "empty_order") {
+        sendError(res, "ORDER_EMPTY", "Cannot check out an order with no items", 409);
+        return;
+    }
+    sendSuccess(res, "Order checked out. Ready for payment.", result);
+};
+
+export const revertOrderHandler = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+): Promise<void> => {
+    const { uuid } = res.locals["validatedParams"];
+    const result = await revertOrderToDraft(uuid);
+
+    if (result === "not_found") {
+        sendError(res, "ORDER_NOT_FOUND", "Order not found", 404);
+        return;
+    }
+    if (result === "not_in_process") {
+        sendError(res, "ORDER_NOT_IN_PROCESS", "Only an order in process can be reverted to draft", 409);
+        return;
+    }
+    sendSuccess(res, "Order reverted to draft. Cart is editable again.", result);
+};
+
 export const cancelOrderHandler = async (
     req: Request,
     res: Response,
@@ -103,20 +165,24 @@ export const paymentHandler = async (
     next: NextFunction
 ): Promise<void> => {
     const { uuid } = res.locals["validatedParams"];
-    const result = await processOrderPayment(uuid);
+    const body = res.locals["validatedBody"] as PayOrderBody;
+    const result = await processOrderPayment(uuid, body);
 
-    switch (result) {
-        case "not_found":
-            sendError(res, "ORDER_NOT_FOUND", "Order not found", 404);
-            return;
-        case "invalid_status":
-            sendError(res, "INVALID_STATUS", "Order is not awaiting payment", 409);
-            return;
-        case "failed":
-            sendError(res, "PAYMENT_FAILED", "Payment failed. Stock restored.", 402);
-            return;
-        case "success":
-            sendSuccess(res, "Payment successful. Order completed.");
-            return;
+    if (result === "not_found") {
+        sendError(res, "ORDER_NOT_FOUND", "Order not found", 404);
+        return;
     }
+    if (result === "invalid_status") {
+        sendError(res, "INVALID_STATUS", "Order is not awaiting payment", 409);
+        return;
+    }
+    if (result === "insufficient_tender") {
+        sendError(res, "INSUFFICIENT_TENDER", "Amount tendered is less than the order total", 409);
+        return;
+    }
+    if (result === "already_paid") {
+        sendError(res, "ALREADY_PAID", "This order has already been paid", 409);
+        return;
+    }
+    sendSuccess(res, "Payment successful. Order completed.", result);
 };

@@ -21,7 +21,6 @@ export interface IProduct {
     sellPrice: number;
     availableStock: number;
     reservedStock: number;
-    softReserved: number;
     minQty: number;
     maxQty: number | null;
     tax: number;

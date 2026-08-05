@@ -1,13 +1,13 @@
 import { findSingleCounterSession } from "../counters/sessions/counter-session.repository.js";
-import type { createOrderSchemaBody, getOrderListSchemaBody, ItemOrderDetailBody } from "./order.schema.js";
-import {addItemTransaction, cancelOrderById, findAllOrders, findOrderByUuid, findSingleOrder, InsertDraftOrder, processPayment, removeItemTransaction, updateOrderStatus, type CreateOrderResult} from "./order.repository.js"
+import type { createOrderSchemaBody, EditOrderItemBody, getOrderListSchemaBody, ItemOrderDetailBody, PayOrderBody } from "./order.schema.js";
+import {addItemTransaction, cancelOrderById, checkoutOrderByUuid, editItemTransaction, findAllOrders, findOrderByUuid, findSingleOrder, InsertDraftOrder, processPayment, removeItemTransaction, revertOrderToDraftByUuid, updateOrderStatus, type OrderStatusResult, type CreateOrderResult, type PaymentResult} from "./order.repository.js"
 import {OrderStatus, type IOrderDetail, type IOrderList} from "../../db/models/order.model.js"
 import { findSingleProduct } from "../products/product.repository.js";
 
 export const createDraftOrder = async (body: createOrderSchemaBody): Promise<"INVALID_SESSION" | CreateOrderResult> => {
     const session = await findSingleCounterSession(body.sessionUuid);
     if(!session) return "INVALID_SESSION";
-    return await InsertDraftOrder(session.id,body.discount, session.userId)
+    return await InsertDraftOrder(session.id, session.userId)
 }
 
 interface sendPaginated {
@@ -91,6 +91,65 @@ export const addOrderItem = async(
     return { message: "ITEM_ADDED", data: result };
 };
 
+interface EditItemSuccessResponse {
+    message: "ITEM_EDITED";
+    data?: {
+        uuid: string;
+        productName: string;
+        sku: string;
+        quantity: number;
+        sellPrice: number;
+        costPrice: number;
+        orderUuid: string;
+        subTotal: number;
+        tax: number;
+        orderTotal: number;
+    }
+}
+
+// quantity edited down to 0 — the line is gone, so this carries no price fields,
+// same shape as removeOrderItem's success response
+interface EditItemRemovedResponse {
+    message: "ITEM_REMOVED";
+    data?: {
+        uuid: string;
+        productName: string;
+        sku: string;
+        quantity: number;
+        orderUuid: string;
+        subTotal: number;
+        tax: number;
+        orderTotal: number;
+    }
+}
+
+interface EditItemErrorResponse {
+    message: "INSUFFICIENT_STOCK" | "ORDER_NOT_FOUND" | "ORDER_NOT_IN_DRAFT" | "ITEM_NOT_FOUND";
+    data?: {
+        productName: string;
+        sku: string;
+        requested: number;
+        available: number;
+    }
+}
+
+export const editOrderItem = async (
+    orderUuid: string,
+    itemUuid: string,
+    body: EditOrderItemBody
+): Promise<EditItemErrorResponse | EditItemSuccessResponse | EditItemRemovedResponse> => {
+
+    const order = await findSingleOrder(orderUuid);
+    if (!order) return { message: "ORDER_NOT_FOUND" };
+    if (order.status !== OrderStatus.DRAFT) return { message: "ORDER_NOT_IN_DRAFT" };
+
+    const result = await editItemTransaction(order.id, itemUuid, body.quantity);
+    if (result.outcome === "not_found") return { message: "ITEM_NOT_FOUND" };
+    if (result.outcome === "insufficient_stock") return { message: "INSUFFICIENT_STOCK", data: result.data };
+    if (result.outcome === "removed") return { message: "ITEM_REMOVED", data: result.data };
+    return { message: "ITEM_EDITED", data: result.data };
+};
+
 interface RemoveItemSuccessResponse {
     message: "ITEM_REMOVED";
     data?: {
@@ -153,6 +212,23 @@ export const holdOrder = async(orderUuid: string): Promise<HoldOrderErrorRespons
     return { message: "ORDER_HELD", data: result };
 };
 
+export const checkoutOrder = async (
+    orderUuid: string
+): Promise<"not_found" | "not_draft" | "empty_order" | OrderStatusResult> => {
+    return checkoutOrderByUuid(orderUuid);
+    // status/empty checks happen inside the transaction with the order locked —
+    // same TOCTOU reasoning as cancelOrder below
+};
+
+// in_process -> draft, so the cashier can edit the cart again before re-checking out.
+// No permission gate — consistent with this workspace having no auth/roles model yet
+// (docs/decisions.md, 2026-07-30 entry).
+export const revertOrderToDraft = async (
+    orderUuid: string
+): Promise<"not_found" | "not_in_process" | OrderStatusResult> => {
+    return revertOrderToDraftByUuid(orderUuid);
+};
+
 export const cancelOrder = async (
     orderUuid: string
 ): Promise<"not_found" | "cannot_cancel" | "success"> => {
@@ -164,7 +240,8 @@ export const cancelOrder = async (
 // src/api/orders/order.service.ts
 
 export const processOrderPayment = async (
-    orderUuid: string
-): Promise<"not_found" | "invalid_status" | "success" | "failed"> => {
-    return processPayment(orderUuid);
+    orderUuid: string,
+    body: PayOrderBody
+): Promise<"not_found" | "invalid_status" | "insufficient_tender" | "already_paid" | PaymentResult> => {
+    return processPayment(orderUuid, body.mode, body.amountTendered);
 };
