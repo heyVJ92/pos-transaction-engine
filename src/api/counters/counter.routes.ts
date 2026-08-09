@@ -28,7 +28,7 @@ counterRouter.delete(
   counterDeleteHandler
 )
 
-counterRouter.put(
+counterRouter.patch(
   "/:uuid",
   validateQuery(uuidParamSchema, "params"),
   validateQuery(updateCounterBodySchema, "body"),

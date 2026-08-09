@@ -2,7 +2,6 @@ import "dotenv/config"; // first line of app.ts, before anything else
 import express from "express";
 import cors from "cors";
 import env from "./config/env.js";
-import { connectDB } from "./config/database.js";
 import router from "./api/index.js"
 const app = express();
 
@@ -32,10 +31,4 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
     res.status(500).json({ success: false, error: { code: "INTERNAL_ERROR", message: "Something Went Wrong" } });
 });
 
-// start
-await connectDB();
-
-app.listen(env.PORT, () => {
-    console.log(`✅ Server running on port http://localhost:${env.PORT}`);
-    console.log(`✅ Environment: ${env.NODE_ENV}`);
-});
+export default app;

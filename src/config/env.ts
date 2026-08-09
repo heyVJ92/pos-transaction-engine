@@ -3,7 +3,7 @@ const env = process.env;
 
 const envSchema = z.object({
     PORT: z.coerce.number().default(3000),
-    NODE_ENV: z.enum(["development", "production", "stage"]),
+    NODE_ENV: z.enum(["development", "production", "stage", "test"]),
     DATABASE_URL: z.string(),
     ALLOWED_ORIGINS: z.string(),
 })
