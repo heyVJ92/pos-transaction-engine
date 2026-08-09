@@ -7,9 +7,11 @@
   "type": "module",
   "main": "dist/app.js",
   "scripts": {
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "build": "npm install && tsc",
-    "start": "node dist/app.js",
-    "dev": "tsx --watch src/app.ts",
+    "start": "node dist/server.js",
+    "dev": "tsx --watch src/server.ts",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seeders/index.ts"
   },
@@ -26,5 +28,12 @@
     "tsx": "^4.23.0",
     "typescript": "^6.0.3",
     "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/supertest": "^7.2.1",
+    "jest": "^30.4.2",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.12"
   }
 }
