@@ -16,6 +16,7 @@ let addCounterMock: jest.Mock<typeof addCounter>;
 let detailCounterMock: jest.Mock<typeof getCounterDetails>;
 let removeCounterMock: jest.Mock<typeof removeCounter>;
 let updateCounterByUUIDMock: jest.Mock<typeof updateCounterByUUID>
+
 const mockCounter = (overrides: Partial<ICounter> = {}): ICounter => ({
     id: 1,
     uuid: "f552f8d1-15fb-4f2a-91d2-f72331d5d8d3",
