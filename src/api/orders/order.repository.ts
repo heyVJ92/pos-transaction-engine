@@ -943,14 +943,11 @@ export interface PaymentResult {
 }
 
 export const processPayment = async (
+    client: PoolClient,
     orderUuid: string,
     mode: PaymentMode,
     amountTendered: number
-): Promise<"not_found" | "invalid_status" | "insufficient_tender" | "already_paid" | PaymentResult> => {
-    const client = await pool.connect();
-    try {
-        await client.query("BEGIN");
-
+): Promise<"not_found" | "invalid_status" | "insufficient_tender" | PaymentResult> => {
         // 1. lock order + validate status — no gateway/decline modeling here (there's no
         // real payment processor behind this), so the only thing left to validate is tender
         const { rows: orderRows } = await client.query<{
@@ -965,17 +962,14 @@ export const processPayment = async (
 
         const order = orderRows[0];
         if (!order) {
-            await client.query("ROLLBACK");
             return "not_found";
         }
         if (order.status !== OrderStatus.INPROCESS) {
-            await client.query("ROLLBACK");
             return "invalid_status";
         }
 
         const total = Number(order.total);
         if (amountTendered < total) {
-            await client.query("ROLLBACK");
             return "insufficient_tender";
         }
         const change = amountTendered - total;
@@ -1044,7 +1038,6 @@ export const processPayment = async (
             [OrderStatus.COMPLETED, order.id]
         );
 
-        await client.query("COMMIT");
         const orderRow = updatedOrder[0]!;
         return {
             orderUuid: orderRow.uuid,
@@ -1057,15 +1050,4 @@ export const processPayment = async (
                 change: Number(payment.change)
             }
         };
-
-    } catch (err) {
-        await client.query("ROLLBACK");
-        if (isPostgresError(err) && err.code === "23505") {
-            return "already_paid";
-        }
-        handleDbError(err);
-        throw err;
-    } finally {
-        client.release();
-    }
 };

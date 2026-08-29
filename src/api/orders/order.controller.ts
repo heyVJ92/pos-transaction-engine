@@ -165,8 +165,23 @@ export const paymentHandler = async (
     next: NextFunction
 ): Promise<void> => {
     const { uuid } = res.locals["validatedParams"];
+    if (!req.user) {
+        throw new Error("Authenticated user missing");
+    }
+    const {id: user_id} = req.user;
     const body = res.locals["validatedBody"] as PayOrderBody;
-    const result = await processOrderPayment(uuid, body);
+    const idempotencyKey = req.get("Idempotency-Key");
+    if (!idempotencyKey?.trim()) {
+        sendError(
+            res,
+            "IDEMPOTENCY_KEY_REQUIRED",
+            "Idempotency-Key header is required",
+            400
+        );
+        return;
+    }
+
+    const result = await processOrderPayment(uuid, user_id, body, idempotencyKey);
 
     if (result === "not_found") {
         sendError(res, "ORDER_NOT_FOUND", "Order not found", 404);
