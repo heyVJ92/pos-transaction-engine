@@ -11,7 +11,7 @@ export const up = `
         http_status INTEGER,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        expires_at TIMESTAMPTZ NOT NULL,
+        expires_at TIMESTAMPTZ,
 
         UNIQUE (user_id, operation, key)
     );

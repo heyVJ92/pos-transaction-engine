@@ -47,3 +47,35 @@ export interface IdempotencyResultUpdate {
 
 export type  IdempotencyResultStatus = 
 | typeof IDEMPOTENCY_STATUS.SUCCESS | typeof IDEMPOTENCY_STATUS.FAILED
+
+export const IDEMPOTENCY_DECISION = {
+    EXECUTE: "execute",
+    HASH_CONFLICT: "hash_conflict",
+    IN_PROGRESS: "in_progress",
+    REPLAY_SUCCESS: "replay_success",
+    REPLAY_FAILURE: "replay_failure"
+} as const
+
+export type IdempotencyDecisionType = typeof IDEMPOTENCY_DECISION[keyof typeof IDEMPOTENCY_DECISION]
+
+export type IdempotencyDecision = |
+{
+    type: typeof IDEMPOTENCY_DECISION.EXECUTE,
+    record: IIdempotency
+} |
+{
+    type: typeof IDEMPOTENCY_DECISION.HASH_CONFLICT,
+} |
+{
+    type: typeof IDEMPOTENCY_DECISION.IN_PROGRESS,
+} |
+{
+    type: typeof IDEMPOTENCY_DECISION.REPLAY_SUCCESS,
+    http_status: number;
+    response_body: unknown;
+} |
+{
+    type: typeof IDEMPOTENCY_DECISION.REPLAY_FAILURE,
+    http_status: number;
+    response_body: unknown;
+}

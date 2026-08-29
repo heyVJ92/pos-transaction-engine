@@ -3,11 +3,8 @@ import { pool } from "../../config/database.js";
 import { handleDbError } from "../../utils/db-errors.js";
 import { IDEMPOTENCY_STATUS, type IIdempotency, type IdempotencyClaimInput, type IdempotencyClaimResult, type IdempotencyOperation, type IdempotencyResultStatus, type IdempotencyResultUpdate } from "../../db/models/idempotency.model.js";
 
-export const claimIdempotency = async(claimInput: IdempotencyClaimInput) : Promise<IdempotencyClaimResult> => {
+export const claimIdempotency = async(client: PoolClient,claimInput: IdempotencyClaimInput) : Promise<IdempotencyClaimResult> => {
     const {user_id, operation, request_hash, key} = claimInput;
-   const client = await pool.connect()
-   try {
-        await client.query("BEGIN");
         const result = await client.query<IIdempotency>("INSERT INTO idempotency (user_id, operation, request_hash, key) VALUES ($1,$2,$3,$4) ON CONFLICT (user_id, operation, key) DO NOTHING RETURNING *", [user_id, operation, request_hash, key])
         if((result.rowCount ?? 0) === 0) {
             const existingRow = await findIdempotencyByScope(client, user_id, operation, key)
@@ -17,7 +14,6 @@ export const claimIdempotency = async(claimInput: IdempotencyClaimInput) : Promi
                   "Idempotency conflict occurred but existing record was not found"
                 );
               }
-            await client.query("COMMIT");
             return {
                 claim_status: false,
                 returned_row: existingRow
@@ -28,18 +24,10 @@ export const claimIdempotency = async(claimInput: IdempotencyClaimInput) : Promi
         if (!insertedRow) {
             throw new Error("Idempotency claim succeeded but no row was returned");
         }
-        await client.query("COMMIT");
         return {
             claim_status: true,
             returned_row: insertedRow
         }
-   } catch (err) {
-        await client.query("ROLLBACK");
-        handleDbError(err);
-        throw err;
-    } finally {
-       client.release()
-   }
 }
 
 
