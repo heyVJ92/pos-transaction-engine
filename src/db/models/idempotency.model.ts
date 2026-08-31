@@ -79,3 +79,12 @@ export type IdempotencyDecision = |
     http_status: number;
     response_body: unknown;
 }
+
+
+
+export const isIdempotencyDecision = (result: unknown): result is IdempotencyDecision => {
+    return (
+        typeof result === "object" && 
+        result !== null && "type" in result
+    )
+}

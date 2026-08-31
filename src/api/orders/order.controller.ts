@@ -3,6 +3,8 @@ import { sendError, sendPaginated, sendSuccess } from "../../utils/response.js";
 import type { createOrderSchemaBody, EditOrderItemBody, getOrderListSchemaBody, ItemOrderDetailBody, PayOrderBody } from "./order.schema.js";
 import {addOrderItem, cancelOrder, checkoutOrder, createDraftOrder, editOrderItem, getOrderDetails, getOrderList, holdOrder, processOrderPayment, removeOrderItem, revertOrderToDraft} from "./order.service.js";
 import type { IOrderDetailPublic, IOrderListPublic } from "../../db/models/order.model.js";
+import { isIdempotencyDecision } from "../../db/models/idempotency.model.js";
+import { handleIdempotencyDecision } from "../../modules/idempotency/idempotency.service.js";
 
 export const createDraftOrderHandler = async (req: Request,res: Response,next: NextFunction): Promise<void> =>{
     const reqBody = res.locals["validatedBody"] as createOrderSchemaBody;
@@ -182,6 +184,10 @@ export const paymentHandler = async (
     }
 
     const result = await processOrderPayment(uuid, user_id, body, idempotencyKey);
+    if (isIdempotencyDecision(result)) {
+        handleIdempotencyDecision(res, result);
+        return;
+    }
 
     if (result === "not_found") {
         sendError(res, "ORDER_NOT_FOUND", "Order not found", 404);
