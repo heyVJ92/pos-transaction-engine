@@ -36,6 +36,8 @@ export const addOrderItemHandler = async(req: Request, res: Response, next: Next
         return;
         case "INSUFFICIENT_STOCK": sendError(res, "INSUFFICIENT_STOCK", "Insufficient Stock", 409, response.data);
         return;
+        case "SOMETHING_WENT_WRONG": sendError(res, "SOMETHING_WENT_WRONG", "Something went wrong", 500, response.data);
+        return;
         case "ITEM_ADDED": sendSuccess(res, "Item added to order.", response.data);
         return;
     }
