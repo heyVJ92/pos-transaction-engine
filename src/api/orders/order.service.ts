@@ -91,9 +91,19 @@ export const addOrderItem = async(
 
     // 3. transaction: lock → check again → update inventory → insert item → recalculate totals
     const result = await addItemTransaction(order.id, product, itemBody);
-    if (!result) return { message: "SOMETHING_WENT_WRONG" };
+    if (result.type === "INSUFFICIENT_STOCK") {
+        return {
+            message: "INSUFFICIENT_STOCK",
+            data: {
+                productName: product.name,
+                sku: product.sku,
+                requested: itemBody.quantity,
+                available: result.available
+            }
+        };
+    }
 
-    return { message: "ITEM_ADDED", data: result };
+    return { message: "ITEM_ADDED", data: result.data };
 };
 
 interface EditItemSuccessResponse {

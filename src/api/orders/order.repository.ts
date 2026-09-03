@@ -235,11 +235,19 @@ const itemAddResult = (addItemRow: ItemAddRow, product_name: string, sku: string
    }
 }
 
+type addItemTransactionResult = | {
+    type: "INSUFFICIENT_STOCK",
+    available: number
+} | {
+    type: "SUCCESS",
+    data: ItemAddPublic
+}
+
 export const addItemTransaction = async (
     order_id: number,
     product: IProductDetail,
     itemBody: ItemOrderDetailBody
-): Promise<ItemAddPublic | null> => {
+): Promise<addItemTransactionResult> => {
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
@@ -254,7 +262,10 @@ export const addItemTransaction = async (
         const available = Number(inventory.rows[0]?.available_stock ?? 0);
         if (available < itemBody.quantity) {
             await client.query("ROLLBACK");
-            return null;
+            return {
+                type: "INSUFFICIENT_STOCK",
+                available
+            };
         }
 
         // update inventory
@@ -303,8 +314,15 @@ export const addItemTransaction = async (
         await client.query("COMMIT");
         const orderRow = orderDetails.rows[0];
         const row = result.rows[0];
-        if (!row) return null;
-        return itemAddResult({...row,...orderRow}, product.name, product.sku);
+        if (!row) {
+            throw new Error("Order item upsert succeeded but returned no row");
+        }
+
+        if (!orderRow) {
+            throw new Error("Order total update succeeded but returned no row");
+        }
+
+        return { type: "SUCCESS", data: itemAddResult({...row,...orderRow}, product.name, product.sku)};
 
     } catch (err) {
         await client.query("ROLLBACK");

@@ -45,5 +45,5 @@ describe("Concurrency: two cashiers racing the last unit of stock", () => {
         
         expect(finalInventory.availableStock).toBe(0);
         expect(finalInventory.reservedStock).toBe(1);
-    }, 30_000);
+    }, 10_000);
 });
