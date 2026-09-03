@@ -3,6 +3,8 @@ import { sendError, sendPaginated, sendSuccess } from "../../utils/response.js";
 import type { createOrderSchemaBody, EditOrderItemBody, getOrderListSchemaBody, ItemOrderDetailBody, PayOrderBody } from "./order.schema.js";
 import {addOrderItem, cancelOrder, checkoutOrder, createDraftOrder, editOrderItem, getOrderDetails, getOrderList, holdOrder, processOrderPayment, removeOrderItem, revertOrderToDraft} from "./order.service.js";
 import type { IOrderDetailPublic, IOrderListPublic } from "../../db/models/order.model.js";
+import { isIdempotencyDecision } from "../../db/models/idempotency.model.js";
+import { handleIdempotencyDecision } from "../../modules/idempotency/idempotency.service.js";
 
 export const createDraftOrderHandler = async (req: Request,res: Response,next: NextFunction): Promise<void> =>{
     const reqBody = res.locals["validatedBody"] as createOrderSchemaBody;
@@ -33,8 +35,6 @@ export const addOrderItemHandler = async(req: Request, res: Response, next: Next
         case "PRODUCT_NOT_FOUND": sendError(res, "PRODUCT_NOT_FOUND", "No Product found with this id.", 409);
         return;
         case "INSUFFICIENT_STOCK": sendError(res, "INSUFFICIENT_STOCK", "Insufficient Stock", 409, response.data);
-        return;
-        case "SOMETHING_WENT_WRONG": sendError(res, "SOMETHING_WENT_WRONG", "Something went wrong", 500, response.data);
         return;
         case "ITEM_ADDED": sendSuccess(res, "Item added to order.", response.data);
         return;
@@ -167,8 +167,27 @@ export const paymentHandler = async (
     next: NextFunction
 ): Promise<void> => {
     const { uuid } = res.locals["validatedParams"];
+    if (!req.user) {
+        throw new Error("Authenticated user missing");
+    }
+    const {id: user_id} = req.user;
     const body = res.locals["validatedBody"] as PayOrderBody;
-    const result = await processOrderPayment(uuid, body);
+    const idempotencyKey = req.get("Idempotency-Key");
+    if (!idempotencyKey?.trim()) {
+        sendError(
+            res,
+            "IDEMPOTENCY_KEY_REQUIRED",
+            "Idempotency-Key header is required",
+            400
+        );
+        return;
+    }
+
+    const result = await processOrderPayment(uuid, user_id, body, idempotencyKey);
+    if (isIdempotencyDecision(result)) {
+        handleIdempotencyDecision(res, result);
+        return;
+    }
 
     if (result === "not_found") {
         sendError(res, "ORDER_NOT_FOUND", "Order not found", 404);

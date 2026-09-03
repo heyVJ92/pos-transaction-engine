@@ -1,4 +1,5 @@
 import { pool } from "../../config/database.js";
+import { IDEMPOTENCY_OPERATION, type IdempotencyStatus } from "../../db/models/idempotency.model.js";
 
 /**
  * Wipes every table this test suite touches and resets identity sequences,
@@ -121,4 +122,61 @@ export const getInventory = async (
 /** Call once in afterAll — leaving the pool open across test files causes Jest to hang on exit. */
 export const closeDb = async (): Promise<void> => {
     await pool.end();
+};
+
+type PaymentVerificationState = {
+    orderStatus: string;
+    idempotencyStatus: IdempotencyStatus;
+    idempotencyHttpStatus: number | null;
+};
+
+export const getPaymentVerificationState = async (
+    orderUuid: string,
+    idempotencyKey: string
+): Promise<PaymentVerificationState> => {
+
+    const { rows: orderRows } = await pool.query<{
+        id: number;
+        status: string;
+        user_id: number;
+    }>(
+        `SELECT id, status, user_id
+         FROM orders
+         WHERE uuid = $1`,
+        [orderUuid]
+    );
+
+    const order = orderRows[0];
+
+    if (!order) {
+        throw new Error("Test verification failed: order not found");
+    }
+
+    const { rows: idempotencyRows } = await pool.query<{
+        status: IdempotencyStatus;
+        http_status: number | null;
+    }>(
+        `SELECT status, http_status
+         FROM idempotency
+         WHERE key = $1
+           AND user_id = $2
+           AND operation = $3`,
+        [
+            idempotencyKey,
+            order.user_id,
+            IDEMPOTENCY_OPERATION.PROCESS_PAYMENT
+        ]
+    );
+
+    const idempotency = idempotencyRows[0];
+
+    if (!idempotency) {
+        throw new Error("Test verification failed: idempotency row not found");
+    }
+
+    return {
+        orderStatus: order.status,
+        idempotencyStatus: idempotency.status,
+        idempotencyHttpStatus: idempotency.http_status
+    };
 };

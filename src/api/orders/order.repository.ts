@@ -235,11 +235,19 @@ const itemAddResult = (addItemRow: ItemAddRow, product_name: string, sku: string
    }
 }
 
+type addItemTransactionResult = | {
+    type: "INSUFFICIENT_STOCK",
+    available: number
+} | {
+    type: "SUCCESS",
+    data: ItemAddPublic
+}
+
 export const addItemTransaction = async (
     order_id: number,
     product: IProductDetail,
     itemBody: ItemOrderDetailBody
-): Promise<ItemAddPublic | null> => {
+): Promise<addItemTransactionResult> => {
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
@@ -254,7 +262,10 @@ export const addItemTransaction = async (
         const available = Number(inventory.rows[0]?.available_stock ?? 0);
         if (available < itemBody.quantity) {
             await client.query("ROLLBACK");
-            return null;
+            return {
+                type: "INSUFFICIENT_STOCK",
+                available
+            };
         }
 
         // update inventory
@@ -303,8 +314,15 @@ export const addItemTransaction = async (
         await client.query("COMMIT");
         const orderRow = orderDetails.rows[0];
         const row = result.rows[0];
-        if (!row) return null;
-        return itemAddResult({...row,...orderRow}, product.name, product.sku);
+        if (!row) {
+            throw new Error("Order item upsert succeeded but returned no row");
+        }
+
+        if (!orderRow) {
+            throw new Error("Order total update succeeded but returned no row");
+        }
+
+        return { type: "SUCCESS", data: itemAddResult({...row,...orderRow}, product.name, product.sku)};
 
     } catch (err) {
         await client.query("ROLLBACK");
@@ -943,14 +961,11 @@ export interface PaymentResult {
 }
 
 export const processPayment = async (
+    client: PoolClient,
     orderUuid: string,
     mode: PaymentMode,
     amountTendered: number
-): Promise<"not_found" | "invalid_status" | "insufficient_tender" | "already_paid" | PaymentResult> => {
-    const client = await pool.connect();
-    try {
-        await client.query("BEGIN");
-
+): Promise<"not_found" | "invalid_status" | "insufficient_tender" | PaymentResult> => {
         // 1. lock order + validate status — no gateway/decline modeling here (there's no
         // real payment processor behind this), so the only thing left to validate is tender
         const { rows: orderRows } = await client.query<{
@@ -965,17 +980,14 @@ export const processPayment = async (
 
         const order = orderRows[0];
         if (!order) {
-            await client.query("ROLLBACK");
             return "not_found";
         }
         if (order.status !== OrderStatus.INPROCESS) {
-            await client.query("ROLLBACK");
             return "invalid_status";
         }
 
         const total = Number(order.total);
         if (amountTendered < total) {
-            await client.query("ROLLBACK");
             return "insufficient_tender";
         }
         const change = amountTendered - total;
@@ -1044,7 +1056,6 @@ export const processPayment = async (
             [OrderStatus.COMPLETED, order.id]
         );
 
-        await client.query("COMMIT");
         const orderRow = updatedOrder[0]!;
         return {
             orderUuid: orderRow.uuid,
@@ -1057,15 +1068,4 @@ export const processPayment = async (
                 change: Number(payment.change)
             }
         };
-
-    } catch (err) {
-        await client.query("ROLLBACK");
-        if (isPostgresError(err) && err.code === "23505") {
-            return "already_paid";
-        }
-        handleDbError(err);
-        throw err;
-    } finally {
-        client.release();
-    }
 };

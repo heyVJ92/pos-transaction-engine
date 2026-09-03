@@ -3,6 +3,11 @@ import type { createOrderSchemaBody, EditOrderItemBody, getOrderListSchemaBody, 
 import {addItemTransaction, cancelOrderById, checkoutOrderByUuid, editItemTransaction, findAllOrders, findOrderByUuid, findSingleOrder, InsertDraftOrder, processPayment, removeItemTransaction, revertOrderToDraftByUuid, updateOrderStatus, type OrderStatusResult, type CreateOrderResult, type PaymentResult} from "./order.repository.js"
 import {OrderStatus, type IOrderDetail, type IOrderList} from "../../db/models/order.model.js"
 import { findSingleProduct } from "../products/product.repository.js";
+import { pool } from "../../config/database.js";
+import { handleDbError, isPostgresError } from "../../utils/db-errors.js";
+import { beginIdempotentOperation } from "../../modules/idempotency/idempotency.service.js";
+import { IDEMPOTENCY_DECISION, type IdempotencyDecision, type IdempotencyResultUpdate } from "../../db/models/idempotency.model.js";
+import { markIdempotencyFailure, markIdempotencySuccess } from "../../modules/idempotency/idempotency.repository.js";
 
 export const createDraftOrder = async (body: createOrderSchemaBody): Promise<"INVALID_SESSION" | CreateOrderResult> => {
     const session = await findSingleCounterSession(body.sessionUuid);
@@ -86,9 +91,19 @@ export const addOrderItem = async(
 
     // 3. transaction: lock → check again → update inventory → insert item → recalculate totals
     const result = await addItemTransaction(order.id, product, itemBody);
-    if (!result) return { message: "SOMETHING_WENT_WRONG" };
+    if (result.type === "INSUFFICIENT_STOCK") {
+        return {
+            message: "INSUFFICIENT_STOCK",
+            data: {
+                productName: product.name,
+                sku: product.sku,
+                requested: itemBody.quantity,
+                available: result.available
+            }
+        };
+    }
 
-    return { message: "ITEM_ADDED", data: result };
+    return { message: "ITEM_ADDED", data: result.data };
 };
 
 interface EditItemSuccessResponse {
@@ -241,7 +256,105 @@ export const cancelOrder = async (
 
 export const processOrderPayment = async (
     orderUuid: string,
-    body: PayOrderBody
-): Promise<"not_found" | "invalid_status" | "insufficient_tender" | "already_paid" | PaymentResult> => {
-    return processPayment(orderUuid, body.mode, body.amountTendered);
+    user_id: number,
+    body: PayOrderBody,
+    idempotencyKey: string
+): Promise<"not_found" | "invalid_status" | "insufficient_tender" | "already_paid" | PaymentResult | IdempotencyDecision> => {
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const idempotency_decision = await beginIdempotentOperation(client, user_id, orderUuid, idempotencyKey, body.mode, body.amountTendered)
+        if(idempotency_decision.type !== IDEMPOTENCY_DECISION.EXECUTE){
+            await client.query("COMMIT");
+            return idempotency_decision
+        }
+        const result = await processPayment(client, orderUuid, body.mode, body.amountTendered);
+        if(typeof result !== "string") {
+            await markIdempotencySuccess(
+                client,
+                idempotency_decision.record.id,
+                mapPaymentSuccessToIdempotencyResult(result)
+            );
+        } else {
+            const failure = mapPaymentFailureToIdempotencyResult(result);
+
+            await markIdempotencyFailure(
+                client,
+                idempotency_decision.record.id,
+                failure
+            );
+        }
+        await client.query("COMMIT");
+        return result;
+      }  catch (err) {
+            await client.query("ROLLBACK");
+            if (isPostgresError(err) && err.code === "23505") {
+                return "already_paid";
+            }
+            handleDbError(err);
+            throw err;
+        } finally {
+            client.release();
+        }
+};
+
+
+type PaymentFailure =
+    | "not_found"
+    | "invalid_status"
+    | "insufficient_tender";
+
+const mapPaymentFailureToIdempotencyResult = (
+    result: PaymentFailure
+): IdempotencyResultUpdate => {
+    switch (result) {
+        case "not_found":
+            return {
+                http_status: 404,
+                response_body: {
+                    success: false,
+                    error: {
+                        code: "ORDER_NOT_FOUND",
+                        message: "Order not found"
+                    }
+                }
+            };
+
+        case "invalid_status":
+            return {
+                http_status: 409,
+                response_body: {
+                    success: false,
+                    error: {
+                        code: "INVALID_STATUS",
+                        message: "Order is not awaiting payment"
+                    }
+                }
+            };
+
+        case "insufficient_tender":
+            return {
+                http_status: 409,
+                response_body: {
+                    success: false,
+                    error: {
+                        code: "INSUFFICIENT_TENDER",
+                        message: "Amount tendered is less than the order total"
+                    }
+                }
+            };
+    }
+};
+
+const mapPaymentSuccessToIdempotencyResult = (
+    result: PaymentResult
+): IdempotencyResultUpdate => {
+    return {
+        http_status: 200,
+        response_body: {
+            success: true,
+            message: "Payment successful. Order completed.",
+            data: result
+        }
+    };
 };
