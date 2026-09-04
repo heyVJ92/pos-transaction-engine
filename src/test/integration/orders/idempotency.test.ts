@@ -37,14 +37,46 @@ describe("Idempotency: Payment API gets duplicate request", () => {
             expect(state.orderStatus).toBe(OrderStatus.COMPLETED);
             expect(state.idempotencyHttpStatus).toBe(200);
             expect(state.idempotencyStatus).toBe(IDEMPOTENCY_STATUS.SUCCESS);
+            expect(state.paymentCount).toBe(1);
 
         }, 30_000)
 
 
-// to-do
-// once payment flow add create test for same Key + same payment payload 
-// show replay the success response instead of creating a duplicate payment
-// so check payment count = 1
+    it("Concurrent request for success, Loser replay success not a new payment", async () => {
+        const idempotency_key = "payment-test-key-001";
+        const {sessionId, userId, productId, productUuid} = await seedBaseFixtures(10);
+
+        const orderUuid = await createDraftOrder(sessionId, userId);
+        const addItemResponse = await request(app).post(`/orders/${orderUuid}/items`).send({
+            productUuid, quantity: 2
+        });
+        expect(addItemResponse.status).toBe(200);
+        // const checkout = await checkoutOrder(orderUuid);
+        const checkoutResponse = await request(app).patch(`/orders/${orderUuid}/checkout`);
+        expect(checkoutResponse.status).toBe(200);
+
+        const [responseA, responseB] = await Promise.all([
+            request(app).patch(`/orders/${orderUuid}/payment`).set("Idempotency-Key", idempotency_key).send({
+                mode: "cash", amountTendered: 40
+            }),
+            request(app).patch(`/orders/${orderUuid}/payment`).set("Idempotency-Key", idempotency_key).send({
+                mode: "cash", amountTendered: 40
+            }),
+        ]);
+
+        const responses = [responseA, responseB];
+        const successes = responses.filter(r => r.status === 200 || r.status === 201);
+        const rejections = responses.filter(r => r.status === 409);
+
+        expect(successes).toHaveLength(2);
+        expect(rejections).toHaveLength(0);
+
+        const state = await getPaymentVerificationState(orderUuid, idempotency_key);
+        expect(state.orderStatus).toBe(OrderStatus.COMPLETED);
+        expect(state.idempotencyHttpStatus).toBe(200);
+        expect(state.idempotencyStatus).toBe(IDEMPOTENCY_STATUS.SUCCESS);
+        expect(state.paymentCount).toBe(1);
+    }, 30_000);
 
     it("Duplicate request get idempotency conflict, 409", async () => {
             const idempotency_key = "payment-test-key-001";
@@ -156,8 +188,38 @@ describe("Idempotency: Payment API gets duplicate request", () => {
             .toBe("IDEMPOTENCY_KEY_REQUIRED");
     });
 
-// to-do Concurrency test for 2 duplicate idempotency requests
-// confirm with payment flow 
-// it should return 200 for both request, but payment count should equals to 1
+    it("Duplicate request for success, replay success not a new payment", async () => {
+        const idempotency_key = "payment-test-key-001";
+        const {sessionId, userId, productId, productUuid} = await seedBaseFixtures(10);
 
+        const orderUuid = await createDraftOrder(sessionId, userId);
+        const addItemResponse = await request(app).post(`/orders/${orderUuid}/items`).send({
+            productUuid, quantity: 2
+        });
+        expect(addItemResponse.status).toBe(200);
+        // const checkout = await checkoutOrder(orderUuid);
+        const checkoutResponse = await request(app).patch(`/orders/${orderUuid}/checkout`);
+        expect(checkoutResponse.status).toBe(200);
+        const paymentResponse = await request(app).patch(`/orders/${orderUuid}/payment`).set("Idempotency-Key", idempotency_key).send({
+            mode: "cash", amountTendered: 40
+        });
+        expect(paymentResponse.status).toBe(200);
+        expect(paymentResponse.body.success).toBe(true);
+
+        const replayResponse = await request(app)
+            .patch(`/orders/${orderUuid}/payment`)
+            .set("Idempotency-Key", idempotency_key)
+            .send({
+                mode: "cash",
+                amountTendered: 40
+            });
+        expect(replayResponse.status).toBe(200);
+        expect(replayResponse.body).toEqual(paymentResponse.body)
+        
+        const state = await getPaymentVerificationState(orderUuid, idempotency_key);
+        expect(state.orderStatus).toBe(OrderStatus.COMPLETED);
+        expect(state.idempotencyHttpStatus).toBe(200);
+        expect(state.idempotencyStatus).toBe(IDEMPOTENCY_STATUS.SUCCESS);
+        expect(state.paymentCount).toBe(1);
+    }, 30_000);
 })

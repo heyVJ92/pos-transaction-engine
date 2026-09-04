@@ -126,6 +126,7 @@ export const closeDb = async (): Promise<void> => {
 
 type PaymentVerificationState = {
     orderStatus: string;
+    paymentCount: number;
     idempotencyStatus: IdempotencyStatus;
     idempotencyHttpStatus: number | null;
 };
@@ -174,8 +175,26 @@ export const getPaymentVerificationState = async (
         throw new Error("Test verification failed: idempotency row not found");
     }
 
+    const { rows: paymentInfo } = await pool.query<{
+        count: number;
+    }>(
+        `SELECT count(*)
+         FROM payments
+         WHERE order_id = $1`,
+        [
+            order.id
+        ]
+    );
+
+    const paymentRow = paymentInfo[0];
+
+    if (!paymentRow) {
+        throw new Error("Test verification failed: payment Count not found");
+    }
+
     return {
         orderStatus: order.status,
+        paymentCount: paymentRow.count,
         idempotencyStatus: idempotency.status,
         idempotencyHttpStatus: idempotency.http_status
     };
