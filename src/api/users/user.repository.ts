@@ -11,6 +11,8 @@ interface UserRow {
     email:      string;
     role:       string;
     status:     string;
+    password_hash: string;
+    last_login_at: string;
     created_at: Date;
     updated_at: Date;
 }
@@ -24,6 +26,8 @@ function rowToUser(row: UserRow): IUser {
         email:     row.email,
         role:      row.role as UserRole,
         status:    row.status as UserStatus,
+        passwordHash: row.password_hash,
+        lashLoginAt: row.last_login_at,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
     };
@@ -104,4 +108,10 @@ export async function findManyUsers(params: GetUsersQuery): Promise<UserQueryRes
         users: dataResult.rows.map(rowToUser),
         total,
     };
+}
+
+
+export const findActiveUserbyEmail = async(email: string): Promise<IUser | null> => {
+    const { rows } = await pool.query('SELECT * FROM users where email = $1 AND status = $2', [email, UserStatus.ACTIVE]);
+    return rows.length > 0 ? rowToUser(rows[0]!) : null
 }

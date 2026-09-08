@@ -5,15 +5,17 @@ import counterRouter from "./counters/counter.routes.js"
 import counterSessionRouter from "./counters/sessions/counter-session.routes.js"
 import inventoryRouter from "./inventory/inventory.routes.js";
 import orderRouter from "./orders/order.routes.js";
-import { temporaryAuth } from "../middlewares/auth.middleware.js";
+import { requireAuth } from "../middlewares/auth.middleware.js";
+import authRouter from "./auth/auth.routes.js";
 
 const router = Router();
 
-router.use("/users", userRouter);
-router.use("/products", temporaryAuth, productRouter);
-router.use("/counters", temporaryAuth, counterRouter);
-router.use("/counter-sessions", temporaryAuth, counterSessionRouter);
-router.use("/inventory", temporaryAuth, inventoryRouter)
-router.use("/orders", temporaryAuth, orderRouter)
+router.use("/auth", authRouter);
+router.use("/users", requireAuth, userRouter);
+router.use("/products", requireAuth, productRouter);
+router.use("/counters", requireAuth, counterRouter);
+router.use("/counter-sessions", requireAuth, counterSessionRouter);
+router.use("/inventory", requireAuth, inventoryRouter)
+router.use("/orders", requireAuth, orderRouter)
 
 export default router;
