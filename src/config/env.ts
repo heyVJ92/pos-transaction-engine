@@ -6,6 +6,7 @@ const envSchema = z.object({
     NODE_ENV: z.enum(["development", "production", "stage", "test"]),
     DATABASE_URL: z.string(),
     ALLOWED_ORIGINS: z.string(),
+    JWT_SECRET: z.string().min(32)
 })
 
 const result = envSchema.safeParse(process.env)

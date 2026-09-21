@@ -16,9 +16,11 @@ export interface IUser {
     lastName: string;
     email: string;
     role: UserRole;
+    passwordHash: string;
+    lashLoginAt: string;
     status: UserStatus;
     createdAt: Date;
     updatedAt: Date
 }
 
-export type IUserPublic = Omit<IUser, "id">;
+export type IUserPublic = Omit<IUser, "id" | "passwordHash" | "lashLoginAt">;
