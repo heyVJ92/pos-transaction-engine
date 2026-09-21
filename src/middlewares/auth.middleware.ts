@@ -24,11 +24,12 @@ export const requireAuth = (req: Request, res: Response, next: NextFunction): vo
 };
 
 
-export const accessCheck = async(allowedRoles: UserRole) => {
-    return async (req: Request, res: Response, next: NextFunction) => {
+export const accessCheck = (allowedRoles: UserRole[]) => {
+    return (req: Request, res: Response, next: NextFunction): void => {
         if (!req.user || !allowedRoles.includes(req.user.role)) {
             sendError(res, "FORBIDDEN", "You do not have permission to perform this action.", 403);
             return;
         }
         next();
-}}
+    };
+};
