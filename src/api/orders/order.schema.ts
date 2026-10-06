@@ -1,4 +1,5 @@
 import * as z from "zod";
+import { OrderStatus } from "../../db/models/order.model.js";
 
 export const createOrderBodySchema = z.object({
     sessionUuid: z.uuid()
@@ -12,6 +13,7 @@ export const getOrderListQuerySchema = z.object({
     userName: z.string().optional(),
     counterName: z.string().optional(),
     counterCode: z.string().optional(),
+    status: z.enum(OrderStatus).optional(),
     page: z.coerce.number().int().min(1).max(100).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(10),
     sort:   z.enum(["order_number", "userName", "total", "discount", "createdAt"]).optional(),

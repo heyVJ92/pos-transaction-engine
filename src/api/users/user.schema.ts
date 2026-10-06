@@ -12,3 +12,12 @@ export const getUsersQuerySchema = z.object({
 }).strict();
 
 export type GetUsersQuery = z.infer<typeof getUsersQuerySchema>;
+
+// Email is deliberately not self-editable here — no re-authentication step exists for changing
+// it, and stockapi's login lookup is keyed on it. Add it back only alongside that decision.
+export const updateSelfBodySchema = z.object({
+  firstName: z.string().min(1).max(255).optional(),
+  lastName:  z.string().min(1).max(255).optional(),
+}).strict();
+
+export type UpdateSelfBody = z.infer<typeof updateSelfBodySchema>;

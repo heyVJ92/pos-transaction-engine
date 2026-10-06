@@ -22,19 +22,26 @@ interface OrderTotals {
 // shared by every item-level mutation that must recompute order totals inside the same
 // transaction as the mutation itself (add/remove/edit all called this identical block before)
 const recalculateOrderTotals = async (client: PoolClient, order_id: number): Promise<OrderTotals> => {
+    // total must be computed from the CTE's freshly-summed sub_total/tax, not the bare column
+    // names — a multi-column UPDATE SET evaluates every right-hand side against the pre-update
+    // row, so `total = sub_total - ... + tax` would read the OLD sub_total/tax, not the values
+    // the sibling `sub_total =`/`tax =` clauses in this same statement are setting. Same pattern
+    // addItemTransaction already uses correctly (its own inline query, below).
     const { rows } = await client.query<OrderTotalsRow>(
-        `UPDATE orders SET
-            sub_total = (
-                SELECT COALESCE(SUM(quantity * sell_price), 0)
-                FROM order_items WHERE order_id = $1
-            ),
-            tax = (
-                SELECT COALESCE(SUM(quantity * (sell_price * tax / 100)), 0)
-                FROM order_items WHERE order_id = $1
-            ),
-            total = sub_total - (sub_total * discount / 100) + tax,
+        `WITH totals AS (
+            SELECT
+                COALESCE(SUM(quantity * sell_price), 0) AS sub_total,
+                COALESCE(SUM(quantity * (sell_price * tax / 100)), 0) AS tax
+            FROM order_items WHERE order_id = $1
+        )
+        UPDATE orders SET
+            sub_total = totals.sub_total,
+            tax = totals.tax,
+            total = totals.sub_total - (totals.sub_total * orders.discount / 100) + totals.tax,
             updated_at = NOW()
-         WHERE id = $1 RETURNING uuid as order_uuid, sub_total, tax, total as order_total`,
+        FROM totals
+        WHERE orders.id = $1
+        RETURNING uuid as order_uuid, orders.sub_total, orders.tax, orders.total as order_total`,
         [order_id]
     );
     const row = rows[0]!;
@@ -134,6 +141,10 @@ const createWhereClause = (params: getOrderListSchemaBody): {
     if(params.userName){
         conditions.push(`CONCAT(U.first_name, ' ', U.last_name) ILIKE $${idx++}`);
         values.push(`%${params.userName}%`);
+    }
+    if(params.status !== undefined){
+        conditions.push(`O.status = $${idx++}`);
+        values.push(params.status);
     }
     if(params.search){
         conditions.push(`(CONCAT(U.first_name, ' ', U.last_name) ILIKE $${idx} OR O.order_number ILIKE $${idx} OR C.code ILIKE $${idx} OR C.name ILIKE $${idx})`)
@@ -742,7 +753,7 @@ export const findOrderByUuid = async (uuid: string): Promise<IOrderDetail | null
 
 export const checkoutOrderByUuid = async (
     orderUuid: string
-): Promise<"not_found" | "not_draft" | "empty_order" | OrderStatusResult> => {
+): Promise<"not_found" | "invalid_status" | "empty_order" | OrderStatusResult> => {
     const client = await pool.connect();
     try {
         await client.query("BEGIN");
@@ -759,9 +770,12 @@ export const checkoutOrderByUuid = async (
             await client.query("ROLLBACK");
             return "not_found";
         }
-        if (order.status !== OrderStatus.DRAFT) {
+        // checkout is allowed from draft (normal flow) or hold (resuming a parked cart) —
+        // items are already reserved in both states, so the transition is identical
+        const checkoutable = [OrderStatus.DRAFT, OrderStatus.HOLD];
+        if (!checkoutable.includes(order.status)) {
             await client.query("ROLLBACK");
-            return "not_draft";
+            return "invalid_status";
         }
 
         const { rows: items } = await client.query<{ product_id: number; quantity: number }>(
@@ -894,40 +908,26 @@ export const cancelOrderById = async (
             [order.id]
         );
 
-        const isDraft = order.status === OrderStatus.DRAFT;
-
-        // 3. restore inventory — parallel per item
+        // 3. restore inventory — parallel per item. No inventory_movement log here:
+        // per the 2026-07-30 redesign, that table is payment-success/return-only — every
+        // other transition (reserve, release, hold, cancel, edit-cart) is deferred to a
+        // separate audit-trail system, kept decoupled from the financial ledger.
         if (items.length > 0) {
             await Promise.all(
                 items.map(item =>
                     client.query(
                         `UPDATE inventory SET
                             available_stock = available_stock + $1,
-                            ${isDraft ? 'reserved_stock' : 'reserved_stock'} = 
-                            ${isDraft ? 'reserved_stock' : 'reserved_stock'} - $1,
+                            reserved_stock = reserved_stock - $1,
                             updated_at = NOW()
                          WHERE product_id = $2`,
                         [item.quantity, item.product_id]
                     )
                 )
             );
-
-            // 4. movement log — only for hard reserved (not draft)
-            if (!isDraft) {
-                await Promise.all(
-                    items.map(item =>
-                        client.query(
-                            `INSERT INTO inventory_movement 
-                             (product_id, order_id, quantity, movement_type)
-                             VALUES ($1, $2, $3, 'reverted')`,
-                            [item.product_id, order.id, item.quantity]
-                        )
-                    )
-                );
-            }
         }
 
-        // 5. update order status
+        // 4. update order status
         await client.query(
             `UPDATE orders SET status = $1, updated_at = NOW() WHERE id = $2`,
             [OrderStatus.CANCELLED, order.id]
@@ -1018,7 +1018,7 @@ export const processPayment = async (
                 `UPDATE inventory
                  SET reserved_stock = reserved_stock - $1, updated_at = NOW()
                  WHERE product_id = $2
-                 RETURNING (reserved_stock + $1) AS stock_before, reserved_stock AS stock_after`,
+                 RETURNING (available_stock + reserved_stock + $1) AS stock_before, (available_stock + reserved_stock) AS stock_after`,
                 [item.quantity, item.product_id]
             );
             const stock = inventoryRows[0]!;

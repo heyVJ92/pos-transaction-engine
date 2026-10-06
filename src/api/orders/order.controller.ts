@@ -110,8 +110,8 @@ export const checkoutOrderHandler = async (
         sendError(res, "ORDER_NOT_FOUND", "Order not found", 404);
         return;
     }
-    if (result === "not_draft") {
-        sendError(res, "ORDER_NOT_IN_DRAFT", "Only a draft order can be checked out", 409);
+    if (result === "invalid_status") {
+        sendError(res, "ORDER_NOT_CHECKOUTABLE", "Order must be in draft or on hold to be checked out", 409);
         return;
     }
     if (result === "empty_order") {

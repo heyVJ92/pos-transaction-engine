@@ -229,10 +229,8 @@ export const holdOrder = async(orderUuid: string): Promise<HoldOrderErrorRespons
 
 export const checkoutOrder = async (
     orderUuid: string
-): Promise<"not_found" | "not_draft" | "empty_order" | OrderStatusResult> => {
+): Promise<"not_found" | "invalid_status" | "empty_order" | OrderStatusResult> => {
     return checkoutOrderByUuid(orderUuid);
-    // status/empty checks happen inside the transaction with the order locked —
-    // same TOCTOU reasoning as cancelOrder below
 };
 
 // in_process -> draft, so the cashier can edit the cart again before re-checking out.
@@ -248,11 +246,7 @@ export const cancelOrder = async (
     orderUuid: string
 ): Promise<"not_found" | "cannot_cancel" | "success"> => {
     return cancelOrderById(orderUuid);
-    // status check happens inside transaction with lock
-    // no pre-check needed — avoids TOCTOU race condition
 };
-
-// src/api/orders/order.service.ts
 
 export const processOrderPayment = async (
     orderUuid: string,
@@ -289,6 +283,7 @@ export const processOrderPayment = async (
       }  catch (err) {
             await client.query("ROLLBACK");
             if (isPostgresError(err) && err.code === "23505") {
+                console.log(err.stack);
                 return "already_paid";
             }
             handleDbError(err);

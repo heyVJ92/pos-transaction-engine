@@ -60,15 +60,15 @@ describe("order.controller", () => {
       expect(res.body.error.code).toBe("ORDER_NOT_FOUND");
     });
 
-    it("returns 409 when the order is not in draft status", async () => {
-      checkoutOrderMock.mockResolvedValue("not_draft");
+    it("returns 409 when the order is not in draft or hold status", async () => {
+      checkoutOrderMock.mockResolvedValue("invalid_status");
       const supertest = await request();
 
       const res = await supertest(app).patch(`/orders/${validUuid}/checkout`);
       console.log(res.status, "status------66", res.body.error);
 
       expect(res.status).toBe(409);
-      expect(res.body.error.code).toBe("ORDER_NOT_IN_DRAFT");
+      expect(res.body.error.code).toBe("ORDER_NOT_CHECKOUTABLE");
     });
 
     it("returns 409 when the order has no items", async () => {
