@@ -1,7 +1,8 @@
 import { pool } from "../../config/database.js";
 import type { IUser, IUserPublic } from "../../db/models/user.model.js";
 import { UserRole, UserStatus } from "../../db/models/user.model.js";
-import type { GetUsersQuery } from "./user.schema.js";
+import type { GetUsersQuery, UpdateSelfBody } from "./user.schema.js";
+import { handleDbError } from "../../utils/db-errors.js";
 
 interface UserRow {
     id:         number;
@@ -79,6 +80,13 @@ export const findSingleUser = async(uuid: string): Promise<IUser | null> => {
     return rows.length > 0 ? rowToUser(rows[0]!) : null
 }
 
+// Lookup by internal id — used for "current user" (req.user.id comes from the JWT's `sub`, see
+// auth.middleware.ts), never exposed to a client directly.
+export const findUserById = async(id: number): Promise<IUser | null> => {
+    const { rows } = await pool.query('SELECT * FROM users where id = $1', [id]);
+    return rows.length > 0 ? rowToUser(rows[0]!) : null
+}
+
 export async function findManyUsers(params: GetUsersQuery): Promise<UserQueryResult> {
     const { sql: where, values, nextIndex } = buildWhereClause(params);
 
@@ -114,4 +122,46 @@ export async function findManyUsers(params: GetUsersQuery): Promise<UserQueryRes
 export const findActiveUserbyEmail = async(email: string): Promise<IUser | null> => {
     const { rows } = await pool.query('SELECT * FROM users where email = $1 AND status = $2', [email, UserStatus.ACTIVE]);
     return rows.length > 0 ? rowToUser(rows[0]!) : null
+}
+
+// Update Method (self-update) from here
+const selfColumnMap: Record<string, string> = {
+    firstName: "first_name",
+    lastName:  "last_name",
+};
+
+const buildSelfUpdateSql = (body: UpdateSelfBody): { sql: string; values: unknown[] } => {
+    const clauses: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    for (const [key, value] of Object.entries(body)) {
+        const column = selfColumnMap[key];
+        if (!column) continue; // skip unknown fields
+        clauses.push(`${column} = $${idx}`);
+        values.push(value);
+        idx++;
+    }
+
+    // always update updated_at
+    clauses.push(`updated_at = NOW()`);
+
+    return {
+        sql: clauses.join(", "),
+        values,
+    };
+};
+
+export const updateUserById = async(id: number, body: UpdateSelfBody): Promise<boolean> => {
+    const { sql, values } = buildSelfUpdateSql(body);
+    try {
+        const result = await pool.query(
+            `UPDATE users SET ${sql} where id = $${values.length + 1} RETURNING uuid`,
+            [...values, id]
+        );
+        return (result.rowCount ?? 0) > 0
+    } catch (err) {
+        handleDbError(err); // converts PG errors to DatabaseError
+        throw err;
+    }
 }
