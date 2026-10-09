@@ -1,6 +1,6 @@
 import * as z from "zod";  // use "import * as z" — matches project convention in env.ts
-import { ProductCategory } from "../../db/models/product.model.js";
 import { MovementType } from "../../db/models/inventory_movement.model.js";
+import { ProductCategory } from "../../db/models/product.model.js";
 export const getInventoryQuerySchema = z.object({
     category: z.enum(ProductCategory).optional(),
     search: z.string().optional(),

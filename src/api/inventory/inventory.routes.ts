@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { validateQuery } from "../../middlewares/validate.js";
-import { accessCheck } from "../../middlewares/auth.middleware.js";
-import { UserRole } from "../../db/models/user.model.js";
 import {uuidParamSchema, restockBodySchema, inventoryMovementQuerySchema} from "./inventory.schema.js";
 import {restockHandler, movementsListHandler} from "./inventory.controller.js"
+import { accessCheck } from "../../middlewares/auth.middleware.js";
+import { UserRole } from "../../db/models/user.model.js";
 
 const inventoryRouter = Router();
 
