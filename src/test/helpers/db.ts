@@ -92,12 +92,6 @@ export const getInventory = async (
     productId: number
 ): Promise<InventorySnapshot> => {
 
-    console.log("GET INVENTORY START", {
-        total: pool.totalCount,
-        idle: pool.idleCount,
-        waiting: pool.waitingCount,
-    });
-
     const { rows } = await pool.query<{
         available_stock: string;
         reserved_stock: string;
@@ -107,13 +101,6 @@ export const getInventory = async (
          WHERE product_id = $1`,
         [productId]
     );
-
-    console.log("GET INVENTORY QUERY FINISHED", {
-        rows,
-        total: pool.totalCount,
-        idle: pool.idleCount,
-        waiting: pool.waitingCount,
-    });
 
     const row = rows[0]!;
 
