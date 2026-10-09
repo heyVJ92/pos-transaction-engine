@@ -182,8 +182,8 @@ export const getPaymentVerificationState = async (
     const { rows: paymentInfo } = await pool.query<{
         count: number;
     }>(
-        `SELECT count(*)
-         FROM payments
+        `SELECT count(*)::int AS count
+         FROM payment
          WHERE order_id = $1`,
         [
             order.id

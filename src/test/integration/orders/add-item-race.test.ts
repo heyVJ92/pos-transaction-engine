@@ -1,5 +1,7 @@
 
 import { describe, expect, it, beforeEach, afterAll } from "@jest/globals";
+import { authHeader } from "../../helpers/auth.js";
+import { UserRole } from "../../../db/models/user.model.js";
 
 import request from "supertest";
 import app from "../../../app.js";
@@ -23,15 +25,18 @@ describe("Concurrency: two cashiers racing the last unit of stock", () => {
     it("one succeeds, one is rejected, stock never goes negative", async () => {
 
         const { sessionId, userId, productId, productUuid } = await seedBaseFixtures(1);
+        const auth = authHeader(UserRole.CASHIER, userId);
 
         const orderAUuid = await createDraftOrder(sessionId, userId);
         const orderBUuid = await createDraftOrder(sessionId, userId);
          const [responseA, responseB] = await Promise.all([
             request(app)
                 .post(`/orders/${orderAUuid}/items`)
+                .set("Authorization", auth)
                 .send({ productUuid, quantity: 1 }),
             request(app)
                 .post(`/orders/${orderBUuid}/items`)
+                .set("Authorization", auth)
                 .send({ productUuid, quantity: 1 }),
         ]);
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, jest, beforeAll } from "@jest/globals";
+import { authHeader } from "../../helpers/auth.js";
 import type { Express } from "express";
 import type { checkoutOrder, processOrderPayment } from "../../../api/orders/order.service.js";
 import { OrderStatus } from "../../../db/models/order.model.js";
@@ -43,7 +44,7 @@ describe("order.controller", () => {
 
     it("returns 400 for a malformed uuid (validation layer, no service call)", async () => {
       const supertest = await request();
-      const res = await supertest(app).patch("/orders/not-a-uuid/checkout");
+      const res = await supertest(app).patch("/orders/not-a-uuid/checkout").set("Authorization", authHeader());
       console.log(res.status, "status------45");
       expect(res.status).toBe(400);
       expect(checkoutOrderMock).not.toHaveBeenCalled();
@@ -53,7 +54,7 @@ describe("order.controller", () => {
       checkoutOrderMock.mockResolvedValue("not_found");
       const supertest = await request();
 
-      const res = await supertest(app).patch(`/orders/${validUuid}/checkout`);
+      const res = await supertest(app).patch(`/orders/${validUuid}/checkout`).set("Authorization", authHeader());
       console.log(res.status, "status------55", res.body.error);
       
       expect(res.status).toBe(404);
@@ -64,7 +65,7 @@ describe("order.controller", () => {
       checkoutOrderMock.mockResolvedValue("invalid_status");
       const supertest = await request();
 
-      const res = await supertest(app).patch(`/orders/${validUuid}/checkout`);
+      const res = await supertest(app).patch(`/orders/${validUuid}/checkout`).set("Authorization", authHeader());
       console.log(res.status, "status------66", res.body.error);
 
       expect(res.status).toBe(409);
@@ -75,7 +76,7 @@ describe("order.controller", () => {
       checkoutOrderMock.mockResolvedValue("empty_order");
       const supertest = await request();
 
-      const res = await supertest(app).patch(`/orders/${validUuid}/checkout`);
+      const res = await supertest(app).patch(`/orders/${validUuid}/checkout`).set("Authorization", authHeader());
       console.log(res.status, "status------77", res.body.error);
 
       expect(res.status).toBe(409);
@@ -89,7 +90,7 @@ describe("order.controller", () => {
       });
       const supertest = await request();
 
-      const res = await supertest(app).patch(`/orders/${validUuid}/checkout`);
+      const res = await supertest(app).patch(`/orders/${validUuid}/checkout`).set("Authorization", authHeader());
       console.log(res.status, "status------91");
 
       expect(res.status).toBe(200);
@@ -103,7 +104,7 @@ describe("order.controller", () => {
 
     it("returns 400 for a malformed uuid (validation layer, no service call)", async () => {
       const supertest = await request();
-      const res = await supertest(app).patch("/orders/not-a-uuid/payment");
+      const res = await supertest(app).patch("/orders/not-a-uuid/payment").set("Authorization", authHeader());
       console.log(res.status, "status------45");
       expect(res.status).toBe(400);
       expect(processOrderPaymentMock).not.toHaveBeenCalled();

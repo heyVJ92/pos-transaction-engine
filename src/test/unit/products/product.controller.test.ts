@@ -1,6 +1,7 @@
 // ===== IMPORTS =====
 // import describe/it/expect/jest/beforeAll/beforeEach from "@jest/globals"
 import { describe, it, jest, expect, beforeAll, beforeEach } from "@jest/globals";
+import { authHeader } from "../../helpers/auth.js";
 import request from "supertest"
 import type {Express} from "express";
 // import type-only the real service function(s) we're about to mock — types only, no side effects
@@ -72,7 +73,7 @@ describe("product.controller", () => {
     describe("GET /products", () => {
         // query validation test
         it("return 400 for invalid query params", async () => {
-            const res = await request(app).get("/products").query({ category: "not_a_category" });
+            const res = await request(app).get("/products").set("Authorization", authHeader()).query({ category: "not_a_category" });
             expect(res.status).toBe(400);
             expect(res.body.error.code).toBe("VALIDATION_ERROR");
             expect(listProductsMock).not.toHaveBeenCalled();
@@ -88,7 +89,7 @@ describe("product.controller", () => {
                 totalPages: 1,
             });
 
-            const res = await request(app).get("/products");
+            const res = await request(app).get("/products").set("Authorization", authHeader());
             expect(res.status).toBe(200);
             expect(res.body.data).toHaveLength(2);
             expect(res.body.meta).toEqual({ total: 2, page: 1, limit: 10, totalPages: 1 });
@@ -103,7 +104,7 @@ describe("product.controller", () => {
     describe("POST /products", () => {
         // body validation test
         it("return 400, rejects invalid body data", async () => {
-            const res = await request(app).post("/products").send({ name: "Product 1" }); // missing required `sku` and `category`
+            const res = await request(app).post("/products").set("Authorization", authHeader()).send({ name: "Product 1" }); // missing required `sku` and `category`
             expect(res.status).toBe(400);
             expect(res.body.error.code).toBe("VALIDATION_ERROR");
             expect(addProductMock).not.toHaveBeenCalled();
@@ -112,7 +113,7 @@ describe("product.controller", () => {
         it("return 201 on successful creation", async () => {
             addProductMock.mockResolvedValue(true);
             const body = { name: "Product 1", sku: "SKU01", category: ProductCategory.SNACKS };
-            const res = await request(app).post("/products").send(body);
+            const res = await request(app).post("/products").set("Authorization", authHeader()).send(body);
             expect(res.status).toBe(201);
             expect(addProductMock).toHaveBeenCalled();
         })
@@ -120,7 +121,7 @@ describe("product.controller", () => {
         it("return 409 for duplicate product sku", async () => {
             addProductMock.mockResolvedValue(false);
             const body = { name: "Product 1", sku: "SKU01", category: ProductCategory.SNACKS };
-            const res = await request(app).post("/products").send(body);
+            const res = await request(app).post("/products").set("Authorization", authHeader()).send(body);
             expect(res.status).toBe(409);
             expect(res.body.error.code).toBe("SKU_ALREADY_EXISTS");
         })
@@ -129,7 +130,7 @@ describe("product.controller", () => {
     describe("GET /products/:uuid", () => {
         // invalid uuid test
         it("return 400 for invalid uuid", async () => {
-            const res = await request(app).get(`/products/INVALID_UUID`);
+            const res = await request(app).get(`/products/INVALID_UUID`).set("Authorization", authHeader());
             expect(res.status).toBe(400);
             expect(res.body.error.code).toBe("VALIDATION_ERROR");
             expect(detailProductMock).not.toHaveBeenCalled();
@@ -137,7 +138,7 @@ describe("product.controller", () => {
         // resource not found
         it("return 404, No resource found with this uuid", async () => {
             detailProductMock.mockResolvedValue(null)
-            const res = await request(app).get(`/products/e824dcce-d570-4c07-941b-428a19a2d88a`)
+            const res = await request(app).get(`/products/e824dcce-d570-4c07-941b-428a19a2d88a`).set("Authorization", authHeader())
             expect(res.status).toBe(404);
             expect(res.body.error.code).toBe("NOT_FOUND");
         })
@@ -146,7 +147,7 @@ describe("product.controller", () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3'
             detailProductMock.mockResolvedValue(mockProduct({ uuid }))
 
-            const res = await request(app).get(`/products/${uuid}`)
+            const res = await request(app).get(`/products/${uuid}`).set("Authorization", authHeader())
             expect(res.status).toBe(200);
             expect(detailProductMock).toHaveBeenCalledWith(uuid);
             expect(res.body.data.uuid).toBe(uuid);
@@ -158,7 +159,7 @@ describe("product.controller", () => {
     describe("PUT /products/:uuid/status", () => {
         // invalid uuid test
         it("return 400 for invalid uuid", async () => {
-            const res = await request(app).put("/products/INVALID_UUID/status");
+            const res = await request(app).put("/products/INVALID_UUID/status").set("Authorization", authHeader());
             expect(res.status).toBe(400);
             expect(res.body.error.code).toBe("VALIDATION_ERROR");
             expect(changeStatusOfProductMock).not.toHaveBeenCalled();
@@ -167,7 +168,7 @@ describe("product.controller", () => {
         it("return 404, product not found", async () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
             changeStatusOfProductMock.mockResolvedValue("not_found");
-            const res = await request(app).put(`/products/${uuid}/status`);
+            const res = await request(app).put(`/products/${uuid}/status`).set("Authorization", authHeader());
             expect(res.status).toBe(404);
             expect(res.body.error.code).toBe("NOT_FOUND");
         })
@@ -175,7 +176,7 @@ describe("product.controller", () => {
         it("return 200 and deactivates an active product", async () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
             changeStatusOfProductMock.mockResolvedValue("deactivated");
-            const res = await request(app).put(`/products/${uuid}/status`);
+            const res = await request(app).put(`/products/${uuid}/status`).set("Authorization", authHeader());
             expect(res.status).toBe(200);
             expect(res.body.message).toBe("Product Deactivated Successfully.");
             expect(changeStatusOfProductMock).toHaveBeenCalledWith(uuid);
@@ -184,7 +185,7 @@ describe("product.controller", () => {
         it("return 200 and activates an inactive product", async () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
             changeStatusOfProductMock.mockResolvedValue("activated");
-            const res = await request(app).put(`/products/${uuid}/status`);
+            const res = await request(app).put(`/products/${uuid}/status`).set("Authorization", authHeader());
             expect(res.status).toBe(200);
             expect(res.body.message).toBe("Product Activated Successfully.");
             expect(changeStatusOfProductMock).toHaveBeenCalledWith(uuid);
@@ -194,7 +195,7 @@ describe("product.controller", () => {
     describe("PUT /products/:uuid", () => {
         // invalid uuid test
         it("return 400 for invalid uuid", async () => {
-            const res = await request(app).put("/products/INVALID_UUID");
+            const res = await request(app).put("/products/INVALID_UUID").set("Authorization", authHeader());
             expect(res.status).toBe(400);
             expect(res.body.error.code).toBe("VALIDATION_ERROR");
             expect(updateProductByUUIDMock).not.toHaveBeenCalled();
@@ -202,7 +203,7 @@ describe("product.controller", () => {
         // request body validation test
         it("return 400, rejected any invalid body data", async () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
-            const res = await request(app).put(`/products/${uuid}`).send({
+            const res = await request(app).put(`/products/${uuid}`).set("Authorization", authHeader()).send({
                 costPrice: "not_a_number"
             });
             expect(res.status).toBe(400);
@@ -214,7 +215,7 @@ describe("product.controller", () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
             updateProductByUUIDMock.mockResolvedValue("sku_conflict");
 
-            const res = await request(app).put(`/products/${uuid}`).send({ sku: "SKU01" });
+            const res = await request(app).put(`/products/${uuid}`).set("Authorization", authHeader()).send({ sku: "SKU01" });
 
             expect(res.status).toBe(409);
             expect(res.body.error.code).toBe("SKU_ALREADY_EXISTS");
@@ -224,7 +225,7 @@ describe("product.controller", () => {
         it("return 404, product not found", async () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
             updateProductByUUIDMock.mockResolvedValue("not_found");
-            const res = await request(app).put(`/products/${uuid}`).send({ name: "Renamed" });
+            const res = await request(app).put(`/products/${uuid}`).set("Authorization", authHeader()).send({ name: "Renamed" });
             expect(res.status).toBe(404);
             expect(res.body.error.code).toBe("NOT_FOUND");
         })
@@ -233,7 +234,7 @@ describe("product.controller", () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
             updateProductByUUIDMock.mockResolvedValue("already_inactive");
 
-            const res = await request(app).put(`/products/${uuid}`).send({ name: "Renamed" });
+            const res = await request(app).put(`/products/${uuid}`).set("Authorization", authHeader()).send({ name: "Renamed" });
 
             expect(res.status).toBe(409);
             expect(res.body.error.code).toBe("ALREADY_INACTIVE");
@@ -244,7 +245,7 @@ describe("product.controller", () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
             updateProductByUUIDMock.mockResolvedValue("success");
 
-            const res = await request(app).put(`/products/${uuid}`).send({ name: "Renamed" });
+            const res = await request(app).put(`/products/${uuid}`).set("Authorization", authHeader()).send({ name: "Renamed" });
 
             expect(res.status).toBe(200);
             expect(updateProductByUUIDMock).toHaveBeenCalledWith(uuid, { name: "Renamed" });

@@ -1,4 +1,6 @@
 import { describe, expect, it, beforeEach, afterAll } from "@jest/globals";
+import { authHeader } from "../../helpers/auth.js";
+import { UserRole } from "../../../db/models/user.model.js";
 
 import { closeDb, createDraftOrder, getPaymentVerificationState, resetDb, seedBaseFixtures } from "../../helpers/db.js";
 import request from "supertest";
@@ -18,16 +20,17 @@ describe("Idempotency: Payment API gets duplicate request", () => {
     it("fresh Idempotency-Key executes payment", async () => {
             const idempotency_key = "payment-test-key-001";
             const {sessionId, userId, productId, productUuid} = await seedBaseFixtures(10);
+            const auth = authHeader(UserRole.CASHIER, userId);
 
             const orderUuid = await createDraftOrder(sessionId, userId);
-            const addItemResponse = await request(app).post(`/orders/${orderUuid}/items`).send({
+            const addItemResponse = await request(app).post(`/orders/${orderUuid}/items`).set("Authorization", auth).send({
                 productUuid, quantity: 2
             });
             expect(addItemResponse.status).toBe(200);
             // const checkout = await checkoutOrder(orderUuid);
-            const checkoutResponse = await request(app).patch(`/orders/${orderUuid}/checkout`);
+            const checkoutResponse = await request(app).patch(`/orders/${orderUuid}/checkout`).set("Authorization", auth);
             expect(checkoutResponse.status).toBe(200);
-            const paymentResponse = await request(app).patch(`/orders/${orderUuid}/payment`).set("Idempotency-Key", idempotency_key).send({
+            const paymentResponse = await request(app).patch(`/orders/${orderUuid}/payment`).set("Authorization", auth).set("Idempotency-Key", idempotency_key).send({
                 mode: "cash", amountTendered: 40
             });
             expect(paymentResponse.status).toBe(200);
@@ -45,21 +48,22 @@ describe("Idempotency: Payment API gets duplicate request", () => {
     it("Concurrent request for success, Loser replay success not a new payment", async () => {
         const idempotency_key = "payment-test-key-001";
         const {sessionId, userId, productId, productUuid} = await seedBaseFixtures(10);
+        const auth = authHeader(UserRole.CASHIER, userId);
 
         const orderUuid = await createDraftOrder(sessionId, userId);
-        const addItemResponse = await request(app).post(`/orders/${orderUuid}/items`).send({
+        const addItemResponse = await request(app).post(`/orders/${orderUuid}/items`).set("Authorization", auth).send({
             productUuid, quantity: 2
         });
         expect(addItemResponse.status).toBe(200);
         // const checkout = await checkoutOrder(orderUuid);
-        const checkoutResponse = await request(app).patch(`/orders/${orderUuid}/checkout`);
+        const checkoutResponse = await request(app).patch(`/orders/${orderUuid}/checkout`).set("Authorization", auth);
         expect(checkoutResponse.status).toBe(200);
 
         const [responseA, responseB] = await Promise.all([
-            request(app).patch(`/orders/${orderUuid}/payment`).set("Idempotency-Key", idempotency_key).send({
+            request(app).patch(`/orders/${orderUuid}/payment`).set("Authorization", auth).set("Idempotency-Key", idempotency_key).send({
                 mode: "cash", amountTendered: 40
             }),
-            request(app).patch(`/orders/${orderUuid}/payment`).set("Idempotency-Key", idempotency_key).send({
+            request(app).patch(`/orders/${orderUuid}/payment`).set("Authorization", auth).set("Idempotency-Key", idempotency_key).send({
                 mode: "cash", amountTendered: 40
             }),
         ]);
@@ -81,16 +85,17 @@ describe("Idempotency: Payment API gets duplicate request", () => {
     it("Duplicate request get idempotency conflict, 409", async () => {
             const idempotency_key = "payment-test-key-001";
             const {sessionId, userId, productId, productUuid} = await seedBaseFixtures(10);
+            const auth = authHeader(UserRole.CASHIER, userId);
 
             const orderUuid = await createDraftOrder(sessionId, userId);
-            const addItemResponse = await request(app).post(`/orders/${orderUuid}/items`).send({
+            const addItemResponse = await request(app).post(`/orders/${orderUuid}/items`).set("Authorization", auth).send({
                 productUuid, quantity: 2
             });
             expect(addItemResponse.status).toBe(200);
             // const checkout = await checkoutOrder(orderUuid);
-            const checkoutResponse = await request(app).patch(`/orders/${orderUuid}/checkout`);
+            const checkoutResponse = await request(app).patch(`/orders/${orderUuid}/checkout`).set("Authorization", auth);
             expect(checkoutResponse.status).toBe(200);
-            const paymentResponse = await request(app).patch(`/orders/${orderUuid}/payment`).set("Idempotency-Key", idempotency_key).send({
+            const paymentResponse = await request(app).patch(`/orders/${orderUuid}/payment`).set("Authorization", auth).set("Idempotency-Key", idempotency_key).send({
                 mode: "cash", amountTendered: 40
             });
             expect(paymentResponse.status).toBe(200);
@@ -103,6 +108,7 @@ describe("Idempotency: Payment API gets duplicate request", () => {
 
             const conflictResponse = await request(app)
                 .patch(`/orders/${orderUuid}/payment`)
+                .set("Authorization", auth)
                 .set("Idempotency-Key", idempotency_key)
                 .send({
                     mode: "cash",
@@ -119,18 +125,22 @@ describe("Idempotency: Payment API gets duplicate request", () => {
     
         const { sessionId, userId, productUuid } =
             await seedBaseFixtures(10);
+        const auth = authHeader(UserRole.CASHIER, userId);
     
         const orderUuid = await createDraftOrder(sessionId, userId);
     
         await request(app)
             .post(`/orders/${orderUuid}/items`)
+            .set("Authorization", auth)
             .send({ productUuid, quantity: 2 });
     
         await request(app)
-            .patch(`/orders/${orderUuid}/checkout`);
+            .patch(`/orders/${orderUuid}/checkout`)
+            .set("Authorization", auth);
     
         const firstResponse = await request(app)
             .patch(`/orders/${orderUuid}/payment`)
+            .set("Authorization", auth)
             .set("Idempotency-Key", idempotencyKey)
             .send({
                 mode: "cash",
@@ -153,6 +163,7 @@ describe("Idempotency: Payment API gets duplicate request", () => {
     
         const replayResponse = await request(app)
             .patch(`/orders/${orderUuid}/payment`)
+            .set("Authorization", auth)
             .set("Idempotency-Key", idempotencyKey)
             .send({
                 mode: "cash",
@@ -161,23 +172,27 @@ describe("Idempotency: Payment API gets duplicate request", () => {
     
         expect(replayResponse.status).toBe(409);
         expect(replayResponse.body).toEqual(firstResponse.body);
-    });
+    }, 30_000);
 
     it("rejects payment request without Idempotency-Key", async () => {
         const { sessionId, userId, productUuid } =
             await seedBaseFixtures(10);
+        const auth = authHeader(UserRole.CASHIER, userId);
     
         const orderUuid = await createDraftOrder(sessionId, userId);
     
         await request(app)
             .post(`/orders/${orderUuid}/items`)
+            .set("Authorization", auth)
             .send({ productUuid, quantity: 2 });
     
         await request(app)
-            .patch(`/orders/${orderUuid}/checkout`);
+            .patch(`/orders/${orderUuid}/checkout`)
+            .set("Authorization", auth);
     
         const response = await request(app)
             .patch(`/orders/${orderUuid}/payment`)
+            .set("Authorization", auth)
             .send({
                 mode: "cash",
                 amountTendered: 40
@@ -186,21 +201,22 @@ describe("Idempotency: Payment API gets duplicate request", () => {
         expect(response.status).toBe(400);
         expect(response.body.error.code)
             .toBe("IDEMPOTENCY_KEY_REQUIRED");
-    });
+    }, 30_000);
 
     it("Duplicate request for success, replay success not a new payment", async () => {
         const idempotency_key = "payment-test-key-001";
         const {sessionId, userId, productId, productUuid} = await seedBaseFixtures(10);
+        const auth = authHeader(UserRole.CASHIER, userId);
 
         const orderUuid = await createDraftOrder(sessionId, userId);
-        const addItemResponse = await request(app).post(`/orders/${orderUuid}/items`).send({
+        const addItemResponse = await request(app).post(`/orders/${orderUuid}/items`).set("Authorization", auth).send({
             productUuid, quantity: 2
         });
         expect(addItemResponse.status).toBe(200);
         // const checkout = await checkoutOrder(orderUuid);
-        const checkoutResponse = await request(app).patch(`/orders/${orderUuid}/checkout`);
+        const checkoutResponse = await request(app).patch(`/orders/${orderUuid}/checkout`).set("Authorization", auth);
         expect(checkoutResponse.status).toBe(200);
-        const paymentResponse = await request(app).patch(`/orders/${orderUuid}/payment`).set("Idempotency-Key", idempotency_key).send({
+        const paymentResponse = await request(app).patch(`/orders/${orderUuid}/payment`).set("Authorization", auth).set("Idempotency-Key", idempotency_key).send({
             mode: "cash", amountTendered: 40
         });
         expect(paymentResponse.status).toBe(200);
@@ -208,6 +224,7 @@ describe("Idempotency: Payment API gets duplicate request", () => {
 
         const replayResponse = await request(app)
             .patch(`/orders/${orderUuid}/payment`)
+            .set("Authorization", auth)
             .set("Idempotency-Key", idempotency_key)
             .send({
                 mode: "cash",

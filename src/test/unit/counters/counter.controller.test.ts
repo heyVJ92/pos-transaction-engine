@@ -1,6 +1,7 @@
 // ===== IMPORTS =====
 // import describe/it/expect/jest/beforeAll/beforeEach from "@jest/globals"
 import { describe, it, jest, expect, beforeAll, beforeEach } from "@jest/globals";
+import { authHeader } from "../../helpers/auth.js";
 import request from "supertest"
 import type {Express} from "express";
 // import type-only the real service function(s) we're about to mock — types only, no side effects
@@ -64,7 +65,7 @@ describe("counter.controller", () => {
         // test cases
             // query validation test
             it("return 400 for invalid query params", async () => {
-                const res = await request(app).get("/counters").query({ status: "not_a_status" });
+                const res = await request(app).get("/counters").set("Authorization", authHeader()).query({ status: "not_a_status" });
                 expect(res.status).toBe(400);
                 expect(res.body.error.code).toBe("VALIDATION_ERROR");
                 expect(listCountersMock).not.toHaveBeenCalled();
@@ -80,7 +81,7 @@ describe("counter.controller", () => {
                     totalPages: 1,
                 });
 
-                const res = await request(app).get("/counters");
+                const res = await request(app).get("/counters").set("Authorization", authHeader());
                 expect(res.status).toBe(200);
                 expect(res.body.data).toHaveLength(2);
                 expect(res.body.meta).toEqual({ total: 2, page: 1, limit: 10, totalPages: 1 });
@@ -95,7 +96,7 @@ describe("counter.controller", () => {
         // test cases
             // body validation test
             it("return 400, rejects invalid body data", async () => {
-                const res = await request(app).post("/counters").send({ name: "Counter 1" }); // missing required `code`
+                const res = await request(app).post("/counters").set("Authorization", authHeader()).send({ name: "Counter 1" }); // missing required `code`
                 expect(res.status).toBe(400);
                 expect(res.body.error.code).toBe("VALIDATION_ERROR");
                 expect(addCounterMock).not.toHaveBeenCalled();
@@ -104,7 +105,7 @@ describe("counter.controller", () => {
             it("return 201 on successful creation", async () => {
                 addCounterMock.mockResolvedValue(true);
                 const body = { name: "Counter 1", code: "C01" };
-                const res = await request(app).post("/counters").send(body);
+                const res = await request(app).post("/counters").set("Authorization", authHeader()).send(body);
                 expect(res.status).toBe(201);
                 expect(addCounterMock).toHaveBeenCalledWith(body);
             })
@@ -112,7 +113,7 @@ describe("counter.controller", () => {
             it("return 409 for duplicate counter code", async () => {
                 addCounterMock.mockResolvedValue(false);
                 const body = { name: "Counter 1", code: "C01" };
-                const res = await request(app).post("/counters").send(body);
+                const res = await request(app).post("/counters").set("Authorization", authHeader()).send(body);
                 expect(res.status).toBe(409);
                 expect(res.body.error.code).toBe("CODE_ALREADY_EXISTS");
             })
@@ -122,7 +123,7 @@ describe("counter.controller", () => {
         // test cases
             // invalid uuid test
             it("retrun 400 for invalid uuid", async() => {
-                const res = await request(app).get(`/counters/INVALID_UUID`);
+                const res = await request(app).get(`/counters/INVALID_UUID`).set("Authorization", authHeader());
                 expect(res.status).toBe(400);
                 expect(res.body.error.code).toBe("VALIDATION_ERROR");
                 expect(detailCounterMock).not.toHaveBeenCalled();
@@ -130,7 +131,7 @@ describe("counter.controller", () => {
             // resource not found
             it("return 404, No resource found with this uuid", async() => {
                 detailCounterMock.mockResolvedValue(null)
-                const res = await request(app).get(`/counters/e824dcce-d570-4c07-941b-428a19a2d88a`)
+                const res = await request(app).get(`/counters/e824dcce-d570-4c07-941b-428a19a2d88a`).set("Authorization", authHeader())
                 expect(res.status).toBe(404);
                 expect(res.body.error.code).toBe("NOT_FOUND");
             })
@@ -139,7 +140,7 @@ describe("counter.controller", () => {
                 const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3'
                 detailCounterMock.mockResolvedValue(mockCounter({ uuid }))
 
-                const res = await request(app).get(`/counters/${uuid}`)
+                const res = await request(app).get(`/counters/${uuid}`).set("Authorization", authHeader())
                 expect(res.status).toBe(200);
                 expect(detailCounterMock).toHaveBeenCalledWith(uuid);
                 expect(res.body.data.uuid).toBe(uuid);  // worth asserting the response actually carries the mocked data through
@@ -152,7 +153,7 @@ describe("counter.controller", () => {
         // test cases
             // invalid uuid test
             it("return 400 for invalid uuid", async () => {
-                const res = await request(app).delete("/counters/INVALID_UUID");
+                const res = await request(app).delete("/counters/INVALID_UUID").set("Authorization", authHeader());
                 expect(res.status).toBe(400);
                 expect(res.body.error.code).toBe("VALIDATION_ERROR");
                 expect(removeCounterMock).not.toHaveBeenCalled();
@@ -161,7 +162,7 @@ describe("counter.controller", () => {
             it("return 404, counter not found", async () => {
                 const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
                 removeCounterMock.mockResolvedValue("not_found");
-                const res = await request(app).delete(`/counters/${uuid}`);
+                const res = await request(app).delete(`/counters/${uuid}`).set("Authorization", authHeader());
                 expect(res.status).toBe(404);
                 expect(res.body.error.code).toBe("NOT_FOUND");
             })
@@ -169,7 +170,7 @@ describe("counter.controller", () => {
             it("return 409 for already inactive counter", async () => {
                 const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
                 removeCounterMock.mockResolvedValue("already_inactive");
-                const res = await request(app).delete(`/counters/${uuid}`);
+                const res = await request(app).delete(`/counters/${uuid}`).set("Authorization", authHeader());
                 expect(res.status).toBe(409);
                 expect(res.body.error.code).toBe("ALREADY_INACTIVE");
             })
@@ -177,7 +178,7 @@ describe("counter.controller", () => {
             it("return 200 on successful deactivation", async () => {
                 const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
                 removeCounterMock.mockResolvedValue("success");
-                const res = await request(app).delete(`/counters/${uuid}`);
+                const res = await request(app).delete(`/counters/${uuid}`).set("Authorization", authHeader());
                 expect(res.status).toBe(200);
                 expect(removeCounterMock).toHaveBeenCalledWith(uuid);
             })
@@ -187,7 +188,7 @@ describe("counter.controller", () => {
         // test cases
             // invalid uuid test
             it("return 400 for invalid uuid", async() => {
-                const res = await request(app).patch("/counters/INVALID_UUID");
+                const res = await request(app).patch("/counters/INVALID_UUID").set("Authorization", authHeader());
                 expect(res.status).toBe(400);
                 expect(res.body.error.code).toBe("VALIDATION_ERROR");
                 expect(updateCounterByUUIDMock).not.toHaveBeenCalled();
@@ -195,7 +196,7 @@ describe("counter.controller", () => {
             // request body validation test
             it("return 400, rejcted any invalid body data", async() => {
                 const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
-                const res = await request(app).patch(`/counters/${uuid}`).send({
+                const res = await request(app).patch(`/counters/${uuid}`).set("Authorization", authHeader()).send({
                     status: "running"
                 });
                 expect(res.status).toBe(400);
@@ -208,7 +209,7 @@ describe("counter.controller", () => {
                 const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
                 updateCounterByUUIDMock.mockResolvedValue("code_conflict");
 
-                const res = await request(app).patch(`/counters/${uuid}`).send({
+                const res = await request(app).patch(`/counters/${uuid}`).set("Authorization", authHeader()).send({
                     code: "C01",   // any body that PASSES validation — the point of this
                                     // test is what happens AFTER validation, so the body
                                     // itself must be valid, only the SERVICE's response
@@ -223,7 +224,7 @@ describe("counter.controller", () => {
             it("return 404, counter not found", async () => {
                 const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
                 updateCounterByUUIDMock.mockResolvedValue("not_found");
-                const res = await request(app).patch(`/counters/${uuid}`).send({ status: "inactive" });
+                const res = await request(app).patch(`/counters/${uuid}`).set("Authorization", authHeader()).send({ status: "inactive" });
                 expect(res.status).toBe(404);
                 expect(res.body.error.code).toBe("NOT_FOUND");
             });
@@ -232,7 +233,7 @@ describe("counter.controller", () => {
                 const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
                 updateCounterByUUIDMock.mockResolvedValue("already_inactive");
 
-                const res = await request(app).patch(`/counters/${uuid}`).send({
+                const res = await request(app).patch(`/counters/${uuid}`).set("Authorization", authHeader()).send({
                     status: "inactive",   // any body that PASSES validation — the point of this
                                     // test is what happens AFTER validation, so the body
                                     // itself must be valid, only the SERVICE's response
@@ -248,7 +249,7 @@ describe("counter.controller", () => {
                 const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
                 updateCounterByUUIDMock.mockResolvedValue("success");
 
-                const res = await request(app).patch(`/counters/${uuid}`).send({
+                const res = await request(app).patch(`/counters/${uuid}`).set("Authorization", authHeader()).send({
                     status: "inactive",   // any body that PASSES validation — the point of this
                                     // test is what happens AFTER validation, so the body
                                     // itself must be valid, only the SERVICE's response

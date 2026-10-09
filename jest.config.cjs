@@ -2,6 +2,7 @@
 module.exports = {
   preset: "ts-jest/presets/default-esm",
   testEnvironment: "node",
+  maxWorkers: 1,
   extensionsToTreatAsEsm: [".ts"],
   moduleNameMapper: {
     // your source imports as "./x.js" per NodeNext, but the real file is "./x.ts" —

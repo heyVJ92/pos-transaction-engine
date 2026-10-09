@@ -1,6 +1,7 @@
 // ===== IMPORTS =====
 // import describe/it/expect/jest/beforeAll/beforeEach from "@jest/globals"
 import { describe, it, jest, expect, beforeAll, beforeEach } from "@jest/globals";
+import { authHeader } from "../../helpers/auth.js";
 import request from "supertest"
 import type {Express} from "express";
 // import type-only the real service function(s) we're about to mock — types only, no side effects
@@ -85,7 +86,7 @@ describe("inventory.controller", () => {
     describe("PUT /inventory/:product_uuid/restock", () => {
         // invalid uuid test
         it("return 400 for invalid uuid", async () => {
-            const res = await request(app).put("/inventory/INVALID_UUID/restock").send({ quantity: 5, unitCost: 10 });
+            const res = await request(app).put("/inventory/INVALID_UUID/restock").set("Authorization", authHeader()).send({ quantity: 5, unitCost: 10 });
             expect(res.status).toBe(400);
             expect(res.body.error.code).toBe("VALIDATION_ERROR");
             expect(restockInventoryMock).not.toHaveBeenCalled();
@@ -93,7 +94,7 @@ describe("inventory.controller", () => {
         // request body validation test
         it("return 400, rejects invalid body data", async () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
-            const res = await request(app).put(`/inventory/${uuid}/restock`).send({ quantity: 0, unitCost: 10 }); // quantity below min(1)
+            const res = await request(app).put(`/inventory/${uuid}/restock`).set("Authorization", authHeader()).send({ quantity: 0, unitCost: 10 }); // quantity below min(1)
             expect(res.status).toBe(400);
             expect(res.body.error.code).toBe("VALIDATION_ERROR");
             expect(restockInventoryMock).not.toHaveBeenCalled();
@@ -102,7 +103,7 @@ describe("inventory.controller", () => {
         it("return 404, product not found", async () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
             restockInventoryMock.mockResolvedValue("NOT_FOUND");
-            const res = await request(app).put(`/inventory/${uuid}/restock`).send({ quantity: 5, unitCost: 10 });
+            const res = await request(app).put(`/inventory/${uuid}/restock`).set("Authorization", authHeader()).send({ quantity: 5, unitCost: 10 });
             expect(res.status).toBe(404);
             expect(res.body.error.code).toBe("PRODUCT_NOT_FOUND");
         })
@@ -110,7 +111,7 @@ describe("inventory.controller", () => {
         it("return 200 on successful restock", async () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
             restockInventoryMock.mockResolvedValue("SUCCESS");
-            const res = await request(app).put(`/inventory/${uuid}/restock`).send({ quantity: 5, unitCost: 10 });
+            const res = await request(app).put(`/inventory/${uuid}/restock`).set("Authorization", authHeader()).send({ quantity: 5, unitCost: 10 });
             expect(res.status).toBe(200);
             expect(restockInventoryMock).toHaveBeenCalledWith(uuid, { quantity: 5, unitCost: 10 });
         })
@@ -119,7 +120,7 @@ describe("inventory.controller", () => {
     describe("GET /inventory/:product_uuid/movements", () => {
         // invalid uuid test
         it("return 400 for invalid uuid", async () => {
-            const res = await request(app).get("/inventory/INVALID_UUID/movements");
+            const res = await request(app).get("/inventory/INVALID_UUID/movements").set("Authorization", authHeader());
             expect(res.status).toBe(400);
             expect(res.body.error.code).toBe("VALIDATION_ERROR");
             expect(movementsListMock).not.toHaveBeenCalled();
@@ -127,7 +128,7 @@ describe("inventory.controller", () => {
         // query validation test
         it("return 400 for invalid query params", async () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
-            const res = await request(app).get(`/inventory/${uuid}/movements`).query({ movementType: "not_a_type" });
+            const res = await request(app).get(`/inventory/${uuid}/movements`).set("Authorization", authHeader()).query({ movementType: "not_a_type" });
             expect(res.status).toBe(400);
             expect(res.body.error.code).toBe("VALIDATION_ERROR");
             expect(movementsListMock).not.toHaveBeenCalled();
@@ -136,7 +137,7 @@ describe("inventory.controller", () => {
         it("return 404, product not found", async () => {
             const uuid = 'f552f8d1-15fb-4f2a-91d2-f72331d5d8d3';
             movementsListMock.mockResolvedValue("NOT_FOUND");
-            const res = await request(app).get(`/inventory/${uuid}/movements`);
+            const res = await request(app).get(`/inventory/${uuid}/movements`).set("Authorization", authHeader());
             expect(res.status).toBe(404);
             expect(res.body.error.code).toBe("PRODUCT_NOT_FOUND");
         })
@@ -152,7 +153,7 @@ describe("inventory.controller", () => {
                 totalPages: 1,
             });
 
-            const res = await request(app).get(`/inventory/${uuid}/movements`);
+            const res = await request(app).get(`/inventory/${uuid}/movements`).set("Authorization", authHeader());
             expect(res.status).toBe(200);
             expect(res.body.data).toHaveLength(2);
             expect(res.body.meta).toEqual({ total: 2, page: 1, limit: 10, totalPages: 1 });
