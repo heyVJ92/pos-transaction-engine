@@ -904,7 +904,7 @@ export const cancelOrderById = async (
             product_id: number;
             quantity: number;
         }>(
-            `SELECT product_id, quantity FROM order_items WHERE order_id = $1`,
+            `SELECT product_id, quantity FROM order_items WHERE order_id = $1 order by product_id ASC`,
             [order.id]
         );
 
@@ -913,18 +913,16 @@ export const cancelOrderById = async (
         // other transition (reserve, release, hold, cancel, edit-cart) is deferred to a
         // separate audit-trail system, kept decoupled from the financial ledger.
         if (items.length > 0) {
-            await Promise.all(
-                items.map(item =>
-                    client.query(
-                        `UPDATE inventory SET
-                            available_stock = available_stock + $1,
-                            reserved_stock = reserved_stock - $1,
-                            updated_at = NOW()
-                         WHERE product_id = $2`,
-                        [item.quantity, item.product_id]
-                    )
+            for(let item of items){
+                await client.query(
+                    `UPDATE inventory SET
+                    available_stock = available_stock + $1,
+                    reserved_stock = reserved_stock - $1,
+                    updated_at = NOW()
+                    WHERE product_id = $2`,
+                    [item.quantity, item.product_id]
                 )
-            );
+            }
         }
 
         // 4. update order status
